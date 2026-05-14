@@ -80,10 +80,18 @@ The selected monitor tile is highlighted. When all monitors are selected, all br
 
 ## Command-line usage
 
-Run from the WinUI project folder:
+Run from the repository root:
 
 ```powershell
+dotnet run --project MonitorBrightness -- --help
 dotnet run --project MonitorBrightness -c Release -- --help
+```
+
+Or use the convenience scripts:
+
+```powershell
+.\run.ps1 --help
+.\run.bat --help
 ```
 
 Published executable examples:
