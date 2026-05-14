@@ -6,34 +6,36 @@ using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using WinRT.Interop;
 using System.Runtime.InteropServices;
-using Microsoft.UI.Composition.SystemBackdrops;
-using Microsoft.UI.Composition;
 
 namespace MonitorBrightness;
 
 /// <summary>
-/// A borderless overlay window that shows just the monitor number badge,
-/// centered on the target monitor with no background.
+/// A borderless overlay window that shows the monitor number badge,
+/// centered on the target monitor. The badge fills the entire window
+/// so there is no visible background frame.
 /// </summary>
 public sealed partial class IdentifyWindow : Window
 {
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS pMarInset);
-
     [DllImport("user32.dll")]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
     [DllImport("user32.dll")]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MARGINS
-    {
-        public int Left, Right, Top, Bottom;
-    }
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
     private const int GWL_EXSTYLE = -20;
-    private const int WS_EX_LAYERED = 0x80000;
+    private const int GWL_STYLE = -16;
+    private const int WS_EX_TOOLWINDOW = 0x80;
+    private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WS_CAPTION = 0x00C00000;
+    private const int WS_THICKFRAME = 0x00040000;
+    private const int WS_BORDER = 0x00800000;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOZORDER = 0x0004;
 
     // Badge dimensions
     private const int BadgeWidth = 280;
@@ -41,22 +43,18 @@ public sealed partial class IdentifyWindow : Window
 
     public IdentifyWindow(MonitorDevice monitor)
     {
+        // Badge fills the entire window — no separate background visible
         var grid = new Grid
         {
-            Background = new SolidColorBrush(Colors.Transparent),
+            Background = new SolidColorBrush(ColorHelper.FromArgb(240, 30, 30, 55)),
+            Padding = new Thickness(40, 24, 40, 24),
         };
 
-        // The visible badge
-        var numberBorder = new Border
+        var numberStack = new StackPanel
         {
-            Background = new SolidColorBrush(ColorHelper.FromArgb(240, 30, 30, 55)),
-            CornerRadius = new CornerRadius(16),
-            Padding = new Thickness(40, 24, 40, 24),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
         };
-
-        var numberStack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
 
         var numberText = new TextBlock
         {
@@ -88,8 +86,7 @@ public sealed partial class IdentifyWindow : Window
         };
         numberStack.Children.Add(resText);
 
-        numberBorder.Child = numberStack;
-        grid.Children.Add(numberBorder);
+        grid.Children.Add(numberStack);
 
         grid.PointerPressed += (s, e) => this.Close();
 
@@ -108,13 +105,21 @@ public sealed partial class IdentifyWindow : Window
             presenter.IsResizable = false;
         }
 
+        // Strip all window frame styles to remove the border
+        int style = GetWindowLong(hwnd, GWL_STYLE);
+        style &= ~(WS_CAPTION | WS_THICKFRAME | WS_BORDER);
+        SetWindowLong(hwnd, GWL_STYLE, style);
+
+        int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        exStyle |= WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+        SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER);
+
         // Center the badge on the monitor
         int centerX = monitor.Left + (monitor.Width - BadgeWidth) / 2;
         int centerY = monitor.Top + (monitor.Height - BadgeHeight) / 2;
         appWindow.MoveAndResize(new RectInt32(centerX, centerY, BadgeWidth, BadgeHeight));
-
-        // Make window fully transparent using DWM
-        var margins = new MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
-        DwmExtendFrameIntoClientArea(hwnd, ref margins);
     }
 }

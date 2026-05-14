@@ -61,8 +61,8 @@ public sealed class AppSettingsTests
         var settingsPath = Path.Combine(directory.Path, "settings", "monitor_brightness_settings.json");
         var settings = new AppSettings
         {
-            MinimizeNotificationShown = true,
             FirstLaunchHotkeyDialogShown = true,
+            CloseToTray = false,
             HotkeyModifiers = (int)HotkeyManager.MOD_ALT,
             HotkeyVirtualKey = 'M',
             HotkeyDisplayText = "Alt+M",
@@ -72,8 +72,8 @@ public sealed class AppSettingsTests
         settings.Save(settingsPath);
         var loaded = AppSettings.Load(settingsPath);
 
-        Assert.True(loaded.MinimizeNotificationShown);
         Assert.True(loaded.FirstLaunchHotkeyDialogShown);
+        Assert.False(loaded.CloseToTray);
         Assert.Equal((int)HotkeyManager.MOD_ALT, loaded.HotkeyModifiers);
         Assert.Equal('M', loaded.HotkeyVirtualKey);
         Assert.Equal("Alt+M", loaded.HotkeyDisplayText);
@@ -90,8 +90,8 @@ public sealed class AppSettingsTests
 
         var settings = AppSettings.Load(settingsPath);
 
-        Assert.False(settings.MinimizeNotificationShown);
         Assert.False(settings.FirstLaunchHotkeyDialogShown);
+        Assert.True(settings.CloseToTray);
         Assert.False(settings.HasHotkey);
         Assert.Equal(AppSettings.DefaultMaxVisibleMonitors, settings.MaxVisibleMonitors);
     }
@@ -105,7 +105,43 @@ public sealed class AppSettingsTests
 
         var settings = AppSettings.Load(settingsPath);
 
+        Assert.True(settings.CloseToTray);
         Assert.False(settings.HasHotkey);
         Assert.Equal(AppSettings.DefaultMaxVisibleMonitors, settings.MaxVisibleMonitors);
+    }
+
+    [Fact]
+    public void NewSettings_CloseToTray_DefaultsToTrue()
+    {
+        var settings = new AppSettings();
+
+        Assert.True(settings.CloseToTray);
+    }
+
+    [Fact]
+    public void Load_OldSettingsWithoutCloseToTray_DefaultsToTrue()
+    {
+        using var directory = new TemporaryDirectory();
+        var settingsPath = Path.Combine(directory.Path, "monitor_brightness_settings.json");
+        // Simulate a settings file saved before CloseToTray existed
+        File.WriteAllText(settingsPath, """{"FirstLaunchHotkeyDialogShown":true,"MaxVisibleMonitors":4}""");
+
+        var settings = AppSettings.Load(settingsPath);
+
+        Assert.True(settings.CloseToTray);
+        Assert.True(settings.FirstLaunchHotkeyDialogShown);
+    }
+
+    [Fact]
+    public void SaveAndLoad_CloseToTrayTrue_RoundTrips()
+    {
+        using var directory = new TemporaryDirectory();
+        var settingsPath = Path.Combine(directory.Path, "monitor_brightness_settings.json");
+        var settings = new AppSettings { CloseToTray = true };
+
+        settings.Save(settingsPath);
+        var loaded = AppSettings.Load(settingsPath);
+
+        Assert.True(loaded.CloseToTray);
     }
 }

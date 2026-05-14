@@ -19,7 +19,7 @@ This project is licensed under the MIT License. See `LICENSE`.
 - Windows App Runtime 2.x installed. The app uses Windows App SDK `2.0.1`.
 - External monitors must support DDC/CI brightness control for the sliders/CLI brightness commands to work.
 
-The published app is self-contained and Native AOT compiled, so it does not require installing the .NET runtime separately.
+The published app is self-contained and Native AOT compiled, so it does not require installing the .NET runtime separately. The AOT version also starts significantly faster than a standard JIT build because the code is compiled ahead of time and skips JIT compilation at startup.
 
 ### Building or running from source
 

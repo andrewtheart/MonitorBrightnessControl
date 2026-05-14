@@ -15,8 +15,8 @@ public class AppSettings
     private static readonly string SettingsPath = Path.Combine(
         AppContext.BaseDirectory, "monitor_brightness_settings.json");
 
-    public bool MinimizeNotificationShown { get; set; }
     public bool FirstLaunchHotkeyDialogShown { get; set; }
+    public bool CloseToTray { get; set; } = true;
     public int HotkeyModifiers { get; set; } // Win32 MOD_ flags
     public int HotkeyVirtualKey { get; set; } // Win32 VK code
     public string HotkeyDisplayText { get; set; } = "";

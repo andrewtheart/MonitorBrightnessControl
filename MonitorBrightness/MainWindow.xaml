@@ -112,6 +112,20 @@
                                Style="{StaticResource CaptionTextBlockStyle}"/>
                 </StackPanel>
 
+                <!-- Close Behavior Section -->
+                <StackPanel Spacing="8" Padding="16" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <TextBlock Text="Close Behavior" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock Text="Choose what happens when you close the window."
+                               Opacity="0.7" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"/>
+                    
+                    <ToggleSwitch x:Name="CloseToTrayToggle" 
+                                  Header="Minimize to system tray on close"
+                                  Toggled="CloseToTrayToggle_Toggled"
+                                  Margin="0,8,0,0"/>
+                </StackPanel>
+
                 <!-- Max Visible Monitors Section -->
                 <StackPanel Spacing="8" Padding="16" CornerRadius="8"
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

@@ -16,6 +16,17 @@ public class TrayIconManager : IDisposable
 
     private const int WM_LBUTTONUP = 0x0202;
     private const int WM_LBUTTONDBLCLK = 0x0203;
+    private const int WM_RBUTTONUP = 0x0205;
+
+    // Context menu constants
+    private const uint MF_STRING = 0x0000;
+    private const uint MF_SEPARATOR = 0x0800;
+    private const uint TPM_RETURNCMD = 0x0100;
+    private const uint TPM_NONOTIFY = 0x0080;
+    private const uint TPM_RIGHTBUTTON = 0x0002;
+
+    private const int IDM_OPEN = 1001;
+    private const int IDM_CLOSE = 1002;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NOTIFYICONDATA
@@ -42,6 +53,31 @@ public class TrayIconManager : IDisposable
     [DllImport("user32.dll")]
     private static extern IntPtr LoadImage(IntPtr hInstance, string lpName, uint uType, int cx, int cy, uint fuLoad);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr CreatePopupMenu();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool AppendMenu(IntPtr hMenu, uint uFlags, nuint uIDNewItem, string lpNewItem);
+
+    [DllImport("user32.dll")]
+    private static extern int TrackPopupMenu(IntPtr hMenu, uint uFlags, int x, int y, int nReserved, IntPtr hWnd, IntPtr prcRect);
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyMenu(IntPtr hMenu);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
     private const uint IMAGE_ICON = 1;
     private const uint LR_LOADFROMFILE = 0x0010;
 
@@ -50,6 +86,7 @@ public class TrayIconManager : IDisposable
     private bool _added;
 
     public event Action? OnTrayIconClicked;
+    public event Action? OnTrayIconCloseClicked;
 
     public void Create(IntPtr hwnd)
     {
@@ -91,8 +128,48 @@ public class TrayIconManager : IDisposable
                 OnTrayIconClicked?.Invoke();
                 return true;
             }
+            if (mouseMsg == WM_RBUTTONUP)
+            {
+                ShowContextMenu();
+                return true;
+            }
         }
         return false;
+    }
+
+    private void ShowContextMenu()
+    {
+        var hMenu = CreatePopupMenu();
+        if (hMenu == IntPtr.Zero) return;
+
+        try
+        {
+            AppendMenu(hMenu, MF_STRING, (nuint)IDM_OPEN, "Open");
+            AppendMenu(hMenu, MF_SEPARATOR, 0, "");
+            AppendMenu(hMenu, MF_STRING, (nuint)IDM_CLOSE, "Close");
+
+            GetCursorPos(out var pt);
+
+            // Required for the menu to dismiss when clicking elsewhere
+            SetForegroundWindow(_hwnd);
+
+            int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
+                pt.X, pt.Y, 0, _hwnd, IntPtr.Zero);
+
+            switch (cmd)
+            {
+                case IDM_OPEN:
+                    OnTrayIconClicked?.Invoke();
+                    break;
+                case IDM_CLOSE:
+                    OnTrayIconCloseClicked?.Invoke();
+                    break;
+            }
+        }
+        finally
+        {
+            DestroyMenu(hMenu);
+        }
     }
 
     public void Remove()

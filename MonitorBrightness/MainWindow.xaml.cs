@@ -58,7 +58,7 @@ public sealed partial class MainWindow : Window
     private const int SW_RESTORE = 9;
     private const int SW_SHOW = 5;
     private const int SW_HIDE = 0;
-    private const int DefaultWindowWidth = 680;
+    private const int DefaultWindowWidth = 580;
 
     private struct CLIENT_RECT
     {
@@ -103,6 +103,7 @@ public sealed partial class MainWindow : Window
         // Setup tray icon
         _trayManager.Create(_hwnd);
         _trayManager.OnTrayIconClicked += RestoreWindow;
+        _trayManager.OnTrayIconCloseClicked += CloseApp;
 
         // Subclass the window to intercept messages
         SubclassWindow();
@@ -184,39 +185,19 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         if (_isClosing) return;
 
-        args.Cancel = true;
-
-        if (!_settings.MinimizeNotificationShown)
+        if (_settings.CloseToTray)
         {
-            _settings.MinimizeNotificationShown = true;
-            _settings.Save();
-
-            var dialog = new ContentDialog
-            {
-                Title = "Minimize to System Tray",
-                Content = "The app will minimize to the system tray instead of closing.\n\n" +
-                          "Click or double-click the tray icon to restore it.\n\n" +
-                          "Would you like to minimize to tray, or close the app entirely?",
-                PrimaryButtonText = "Minimize to Tray",
-                SecondaryButtonText = "Close App",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = this.Content.XamlRoot,
-            };
-
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Secondary)
-            {
-                CloseApp();
-                return;
-            }
+            args.Cancel = true;
+            ShowWindow(_hwnd, SW_HIDE);
         }
-
-        // Hide window (minimize to tray)
-        ShowWindow(_hwnd, SW_HIDE);
+        else
+        {
+            CloseApp();
+        }
     }
 
     private void CloseApp()
@@ -240,10 +221,11 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             Title = "Welcome!",
-            Content = "You can assign a global hotkey to quickly bring this app to the foreground from anywhere.\n\n" +
-                      "Would you like to set up a hotkey now?",
-            PrimaryButtonText = "Yes, set up hotkey",
-            SecondaryButtonText = "Not now",
+            Content = "By default, closing the window minimizes the app to the system tray instead of exiting.\n\n" +
+                      "You can also assign a global hotkey to quickly bring this app to the foreground from anywhere.\n\n" +
+                      "Would you like to change these settings now?",
+            PrimaryButtonText = "Open Settings",
+            SecondaryButtonText = "Keep defaults",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.Content.XamlRoot,
         };
@@ -301,13 +283,43 @@ public sealed partial class MainWindow : Window
             HotkeyTextBox.Text = _settings.HotkeyDisplayText;
             HotkeyStatus.Text = "✓ Hotkey is active";
         }
+        CloseToTrayToggle.IsOn = _settings.CloseToTray;
         MaxMonitorsNumberBox.Value = _settings.MaxVisibleMonitors;
+        ResizeWindowToContent();
+    }
+
+    private void ResizeWindowToContent()
+    {
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            RootGrid.UpdateLayout();
+
+            var dpi = GetDpiForWindow(_hwnd);
+            double scale = dpi / 96.0;
+            double widthDips = Math.Max(GetClientWidthPixels() / scale, 1);
+
+            RootGrid.Measure(new Windows.Foundation.Size(widthDips, double.PositiveInfinity));
+            int targetHeight = Math.Max((int)Math.Ceiling(RootGrid.DesiredSize.Height * scale), 200);
+
+            var currentSize = this.AppWindow.Size;
+            int clientHeight = GetClientHeightPixels();
+            int outerTargetHeight = currentSize.Height + (targetHeight - clientHeight);
+            if (Math.Abs(clientHeight - targetHeight) > 1)
+                this.AppWindow.Resize(new SizeInt32(Math.Max(currentSize.Width, DefaultWindowWidth), Math.Max(outerTargetHeight, 200)));
+        });
+    }
+
+    private void CloseToTrayToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        _settings.CloseToTray = CloseToTrayToggle.IsOn;
+        _settings.Save();
     }
 
     private void SettingsBack_Click(object sender, RoutedEventArgs e)
     {
         SettingsOverlay.Visibility = Visibility.Collapsed;
         _isRecordingHotkey = false;
+        ResizeWindowToFit(_monitors.Count);
     }
 
     private void HotkeyTextBox_GotFocus(object sender, RoutedEventArgs e)
@@ -708,7 +720,7 @@ public sealed partial class MainWindow : Window
 
         var badge = new Border
         {
-            Background = new SolidColorBrush(ColorHelper.FromArgb(255, 96, 165, 250)),
+            Background = new SolidColorBrush(ColorHelper.FromArgb(255, 55, 90, 180)),
             CornerRadius = new CornerRadius(3),
             Padding = new Thickness(6, 1, 6, 1),
             VerticalAlignment = VerticalAlignment.Center,
