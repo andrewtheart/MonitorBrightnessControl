@@ -23,7 +23,7 @@ The published app is self-contained and Native AOT compiled, so it does not requ
 
 ### Building or running from source
 
-- .NET 10 SDK.
+- .NET 10 SDK `10.0.300` or newer. The build scripts below check for this automatically and offer to install it via winget if it is missing.
 - Windows SDK `10.0.26100.0` or newer.
 - Windows App SDK build support for WinUI 3 projects.
 
@@ -83,8 +83,7 @@ The selected monitor tile is highlighted. When all monitors are selected, all br
 Run from the WinUI project folder:
 
 ```powershell
-cd MonitorBrightness
-dotnet run -c Release -- --help
+dotnet run --project MonitorBrightness -c Release -- --help
 ```
 
 Published executable examples:
@@ -109,12 +108,17 @@ Commands:
 - `--identify`, `--id` - print monitor identification information.
 - `--help`, `/help`, `-h`, `-?`, `/?` - show CLI help. If any help flag is present, all other CLI flags are ignored.
 
-## Build
+## Building
+
+Run the PowerShell script for the target you want:
 
 ```powershell
-dotnet build MonitorBrightnessControl.slnx -c Debug
-dotnet build MonitorBrightnessControl.slnx -c Release
+.\build-debug.ps1      # Debug build
+.\build-release.ps1    # Release build
+.\build-aot.ps1        # Native AOT publish (Release)
 ```
+
+Each script checks for the required .NET 10 SDK and offers to install it if it is not found.
 
 ## Test
 

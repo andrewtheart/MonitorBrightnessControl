@@ -59,6 +59,8 @@ public sealed partial class MainWindow : Window
     private const int SW_SHOW = 5;
     private const int SW_HIDE = 0;
     private const int DefaultWindowWidth = 580;
+    private const int MinDialogWindowWidth = 500;
+    private const int MinDialogWindowHeight = 380;
 
     private struct CLIENT_RECT
     {
@@ -122,6 +124,11 @@ public sealed partial class MainWindow : Window
 
         LoadMonitors();
         RootGrid.Focus(FocusState.Programmatic);
+
+        // Position window according to settings (or CLI overrides)
+        ApplyStartPosition(
+            App.OverridePosition ?? _settings.StartPosition,
+            App.OverrideDisplay ?? _settings.StartDisplay);
 
         // Show first-launch hotkey dialog
         if (!_settings.FirstLaunchHotkeyDialogShown)
@@ -210,6 +217,40 @@ public sealed partial class MainWindow : Window
         this.Close();
     }
 
+    /// <summary>
+    /// Temporarily enlarges the window so a ContentDialog has enough room,
+    /// then restores the original size after the dialog is dismissed.
+    /// </summary>
+    private async Task<ContentDialogResult> ShowDialogWithMinSize(ContentDialog dialog)
+    {
+        var dpi = GetDpiForWindow(_hwnd);
+        double scale = dpi / 96.0;
+        int minWidthPx = (int)(MinDialogWindowWidth * scale);
+        int minHeightPx = (int)(MinDialogWindowHeight * scale);
+
+        var originalSize = this.AppWindow.Size;
+        bool resized = false;
+
+        if (originalSize.Width < minWidthPx || originalSize.Height < minHeightPx)
+        {
+            resized = true;
+            this.AppWindow.Resize(new SizeInt32(
+                Math.Max(originalSize.Width, minWidthPx),
+                Math.Max(originalSize.Height, minHeightPx)));
+            // Let layout settle after resize
+            await Task.Delay(100);
+        }
+
+        var result = await dialog.ShowAsync();
+
+        if (resized)
+        {
+            this.AppWindow.Resize(originalSize);
+        }
+
+        return result;
+    }
+
     private async Task ShowFirstLaunchDialog()
     {
         // Small delay to ensure window is fully loaded
@@ -230,7 +271,7 @@ public sealed partial class MainWindow : Window
             XamlRoot = this.Content.XamlRoot,
         };
 
-        var result = await dialog.ShowAsync();
+        var result = await ShowDialogWithMinSize(dialog);
         if (result == ContentDialogResult.Primary)
         {
             ShowSettingsPanel();
@@ -271,7 +312,7 @@ public sealed partial class MainWindow : Window
             XamlRoot = this.Content.XamlRoot,
         };
 
-        await dialog.ShowAsync();
+        await ShowDialogWithMinSize(dialog);
         RootGrid.Focus(FocusState.Programmatic);
     }
 
@@ -285,6 +326,20 @@ public sealed partial class MainWindow : Window
         }
         CloseToTrayToggle.IsOn = _settings.CloseToTray;
         MaxMonitorsNumberBox.Value = _settings.MaxVisibleMonitors;
+
+        // Select the matching position item
+        var posTag = _settings.StartPosition.ToString();
+        for (int i = 0; i < StartPositionComboBox.Items.Count; i++)
+        {
+            if (StartPositionComboBox.Items[i] is ComboBoxItem item && item.Tag is string tag && tag == posTag)
+            {
+                StartPositionComboBox.SelectedIndex = i;
+                break;
+            }
+        }
+
+        StartDisplayNumberBox.Value = _settings.StartDisplay;
+
         ResizeWindowToContent();
     }
 
@@ -402,6 +457,24 @@ public sealed partial class MainWindow : Window
         _settings.MaxVisibleMonitors = (int)args.NewValue;
         _settings.Save();
         ResizeWindowToFit(_monitors.Count);
+    }
+
+    private void StartPositionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (StartPositionComboBox.SelectedItem is ComboBoxItem item &&
+            item.Tag is string tag &&
+            Enum.TryParse<WindowPosition>(tag, out var pos))
+        {
+            _settings.StartPosition = pos;
+            _settings.Save();
+        }
+    }
+
+    private void StartDisplayNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (double.IsNaN(args.NewValue)) return;
+        _settings.StartDisplay = (int)args.NewValue;
+        _settings.Save();
     }
 
     #endregion
@@ -695,6 +768,88 @@ public sealed partial class MainWindow : Window
     {
         return GetClientRect(_hwnd, out var rect) ? rect.Right - rect.Left : this.AppWindow.Size.Width;
     }
+
+    #region Window Positioning
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    private const int EdgeOffset = 32; // pixels offset from screen edges
+
+    /// <summary>
+    /// Positions the window according to the given position and display settings.
+    /// </summary>
+    internal void ApplyStartPosition(WindowPosition position, int displayNumber)
+    {
+        var workAreas = new List<RECT>();
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMonitor, IntPtr _, ref RECT _, IntPtr _) =>
+        {
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (GetMonitorInfo(hMonitor, ref info))
+                workAreas.Add(info.rcWork);
+            return true;
+        }, IntPtr.Zero);
+
+        if (workAreas.Count == 0)
+            return;
+
+        // displayNumber: 0 = primary (first), 1-based otherwise
+        int idx = displayNumber > 0 ? Math.Min(displayNumber - 1, workAreas.Count - 1) : 0;
+        var work = workAreas[idx];
+
+        var windowSize = this.AppWindow.Size;
+        int w = windowSize.Width;
+        int h = windowSize.Height;
+
+        int areaW = work.Right - work.Left;
+        int areaH = work.Bottom - work.Top;
+
+        int x = position switch
+        {
+            WindowPosition.TopLeft or WindowPosition.MiddleLeft or WindowPosition.BottomLeft
+                => work.Left + EdgeOffset,
+            WindowPosition.TopCenter or WindowPosition.Center or WindowPosition.BottomCenter
+                => work.Left + (areaW - w) / 2,
+            WindowPosition.TopRight or WindowPosition.MiddleRight or WindowPosition.BottomRight
+                => work.Right - w - EdgeOffset,
+            _ => work.Left + (areaW - w) / 2,
+        };
+
+        int y = position switch
+        {
+            WindowPosition.TopLeft or WindowPosition.TopCenter or WindowPosition.TopRight
+                => work.Top + EdgeOffset,
+            WindowPosition.MiddleLeft or WindowPosition.Center or WindowPosition.MiddleRight
+                => work.Top + (areaH - h) / 2,
+            WindowPosition.BottomLeft or WindowPosition.BottomCenter or WindowPosition.BottomRight
+                => work.Bottom - h - EdgeOffset,
+            _ => work.Top + (areaH - h) / 2,
+        };
+
+        this.AppWindow.Move(new PointInt32(x, y));
+    }
+
+    #endregion
 
     private UIElement CreateMonitorCard(MonitorDevice monitor)
     {

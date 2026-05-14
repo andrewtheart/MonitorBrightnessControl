@@ -4,6 +4,23 @@ using System.Text.Json.Serialization;
 namespace MonitorBrightness;
 
 /// <summary>
+/// The nine anchor positions for placing the window on a display.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<WindowPosition>))]
+public enum WindowPosition
+{
+    TopLeft,
+    TopCenter,
+    TopRight,
+    MiddleLeft,
+    Center,
+    MiddleRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+}
+
+/// <summary>
 /// Persists app settings to a JSON file next to the executable.
 /// </summary>
 public class AppSettings
@@ -21,6 +38,12 @@ public class AppSettings
     public int HotkeyVirtualKey { get; set; } // Win32 VK code
     public string HotkeyDisplayText { get; set; } = "";
     public int MaxVisibleMonitors { get; set; } = DefaultMaxVisibleMonitors;
+    public WindowPosition StartPosition { get; set; } = WindowPosition.Center;
+
+    /// <summary>
+    /// 1-based display number the window should appear on. 0 means primary display.
+    /// </summary>
+    public int StartDisplay { get; set; }
 
     public static AppSettings Load()
     {
@@ -87,6 +110,7 @@ public class AppSettings
 
 [JsonSourceGenerationOptions(WriteIndented = true)]
 [JsonSerializable(typeof(AppSettings))]
+[JsonSerializable(typeof(WindowPosition))]
 internal partial class AppSettingsJsonContext : JsonSerializerContext
 {
 }

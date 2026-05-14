@@ -20,6 +20,9 @@ public static class Program
             return;
         }
 
+        // Parse GUI launch flags (--position, --display)
+        ParseGuiFlags(args);
+
         // This is a console-subsystem executable so CLI commands behave like a normal terminal app.
         // For GUI mode, detach from the auto-created console before starting WinUI.
         FreeConsole();
@@ -32,5 +35,26 @@ public static class Program
             SynchronizationContext.SetSynchronizationContext(context);
             _ = new App();
         });
+    }
+
+    private static void ParseGuiFlags(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            var arg = args[i].ToLowerInvariant().TrimStart('-', '/');
+
+            if (arg is "position" or "pos" or "p" && i + 1 < args.Length)
+            {
+                if (Enum.TryParse<WindowPosition>(args[i + 1], ignoreCase: true, out var pos))
+                    App.OverridePosition = pos;
+                i++;
+            }
+            else if (arg is "display" or "d" && i + 1 < args.Length)
+            {
+                if (int.TryParse(args[i + 1], out int display))
+                    App.OverrideDisplay = display;
+                i++;
+            }
+        }
     }
 }

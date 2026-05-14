@@ -99,6 +99,16 @@ public static class CliHandler
         Console.WriteLine("      Print monitor identification details: display number, monitor name,");
         Console.WriteLine("      resolution, and virtual desktop position.");
         Console.WriteLine();
+        Console.WriteLine("GUI launch flags (can be combined with no command or with each other):");
+        Console.WriteLine();
+        Console.WriteLine("  --position, --pos, -p <position>");
+        Console.WriteLine("      Override the window start position for this launch.");
+        Console.WriteLine("      Positions: TopLeft, TopCenter, TopRight, MiddleLeft, Center,");
+        Console.WriteLine("                 MiddleRight, BottomLeft, BottomCenter, BottomRight");
+        Console.WriteLine();
+        Console.WriteLine("  --display, -d <number>");
+        Console.WriteLine("      Override the display the window appears on (1-based, 0 = primary).");
+        Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  MonitorBrightness --list");
         Console.WriteLine("  MonitorBrightness --get");
@@ -109,6 +119,8 @@ public static class CliHandler
         Console.WriteLine("  MonitorBrightness --set 1-4 60");
         Console.WriteLine("  MonitorBrightness --set 1 3 4 80");
         Console.WriteLine("  MonitorBrightness --identify");
+        Console.WriteLine("  MonitorBrightness --position TopRight");
+        Console.WriteLine("  MonitorBrightness --position BottomLeft --display 2");
         Console.WriteLine("  MonitorBrightness --set 1 75 --help");
         Console.WriteLine("      Shows help; the --set command is ignored because --help is present.");
         Console.WriteLine();

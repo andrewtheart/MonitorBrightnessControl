@@ -140,6 +140,44 @@
                                ValueChanged="MaxMonitorsNumberBox_ValueChanged"
                                Margin="0,8,0,0" MaxWidth="160" HorizontalAlignment="Left"/>
                 </StackPanel>
+
+                <!-- Start Position Section -->
+                <StackPanel Spacing="8" Padding="16" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <TextBlock Text="Start Position" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock Text="Where the window appears when launched."
+                               Opacity="0.7" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"/>
+
+                    <ComboBox x:Name="StartPositionComboBox"
+                              SelectionChanged="StartPositionComboBox_SelectionChanged"
+                              Margin="0,8,0,0" MinWidth="180">
+                        <ComboBoxItem Content="Top Left" Tag="TopLeft"/>
+                        <ComboBoxItem Content="Top Center" Tag="TopCenter"/>
+                        <ComboBoxItem Content="Top Right" Tag="TopRight"/>
+                        <ComboBoxItem Content="Middle Left" Tag="MiddleLeft"/>
+                        <ComboBoxItem Content="Center" Tag="Center"/>
+                        <ComboBoxItem Content="Middle Right" Tag="MiddleRight"/>
+                        <ComboBoxItem Content="Bottom Left" Tag="BottomLeft"/>
+                        <ComboBoxItem Content="Bottom Center" Tag="BottomCenter"/>
+                        <ComboBoxItem Content="Bottom Right" Tag="BottomRight"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Start Display Section -->
+                <StackPanel Spacing="8" Padding="16" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <TextBlock Text="Start Display" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock Text="Which display the window appears on. 0 = primary display."
+                               Opacity="0.7" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"/>
+
+                    <NumberBox x:Name="StartDisplayNumberBox"
+                               Minimum="0" Maximum="16"
+                               SpinButtonPlacementMode="Inline"
+                               ValueChanged="StartDisplayNumberBox_ValueChanged"
+                               Margin="0,8,0,0" MaxWidth="160" HorizontalAlignment="Left"/>
+                </StackPanel>
             </StackPanel>
         </Grid>
     </Grid>

@@ -6,6 +6,12 @@ public partial class App : Application
 {
     private Window? _window;
 
+    /// <summary>CLI override for window position (null = use settings).</summary>
+    public static WindowPosition? OverridePosition { get; set; }
+
+    /// <summary>CLI override for display number (null = use settings).</summary>
+    public static int? OverrideDisplay { get; set; }
+
     public App()
     {
         this.InitializeComponent();
