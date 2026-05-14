@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI;
 using Windows.Graphics;
 using Windows.System;
@@ -15,26 +14,17 @@ public sealed partial class MainWindow : Window
 {
     private List<MonitorDevice> _monitors = new();
     private readonly List<MonitorUi> _monitorControls = new();
-    private readonly List<Window> _identifyWindows = new();
-    private DispatcherTimer? _identifyTimer;
     private AppSettings _settings;
     private HotkeyManager _hotkeyManager;
     private TrayIconManager _trayManager;
     private BrightnessUpdateQueue _brightnessUpdates;
+    private MonitorCardFactory _cardFactory;
+    private WindowSizer _windowSizer;
+    private KeyboardBrightnessController _keyboardController;
+    private IdentifyOverlayManager _identifyOverlays;
     private IntPtr _hwnd;
     private bool _isRecordingHotkey;
     private bool _isClosing;
-    private int _targetClientHeightPixels;
-    private int? _selectedMonitorIndex;
-    private bool _allMonitorsSelected;
-
-    private sealed class MonitorUi
-    {
-        public required MonitorDevice Monitor { get; init; }
-        public required Border Card { get; init; }
-        public Slider? Slider { get; init; }
-        public TextBlock? PercentLabel { get; init; }
-    }
 
     // Win32 interop for window messages
     private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
@@ -49,24 +39,12 @@ public sealed partial class MainWindow : Window
     private static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    [DllImport("user32.dll")]
-    private static extern bool IsIconic(IntPtr hWnd);
-    [DllImport("user32.dll")]
-    private static extern bool GetClientRect(IntPtr hWnd, out CLIENT_RECT lpRect);
 
     private const int GWL_WNDPROC = -4;
     private const int SW_RESTORE = 9;
     private const int SW_SHOW = 5;
     private const int SW_HIDE = 0;
     private const int DefaultWindowWidth = 580;
-
-    private struct CLIENT_RECT
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
 
     public MainWindow()
     {
@@ -78,8 +56,13 @@ public sealed partial class MainWindow : Window
         _hotkeyManager = new HotkeyManager();
         _trayManager = new TrayIconManager();
         _brightnessUpdates = new BrightnessUpdateQueue();
+        _keyboardController = new KeyboardBrightnessController(_monitorControls);
+        _identifyOverlays = new IdentifyOverlayManager();
 
         _hwnd = WindowNative.GetWindowHandle(this);
+
+        _cardFactory = new MonitorCardFactory(_brightnessUpdates, _keyboardController.SelectMonitor);
+        _windowSizer = new WindowSizer(this, _hwnd, DefaultWindowWidth);
 
         // Extend content into title bar for seamless look
         this.ExtendsContentIntoTitleBar = true;
@@ -118,16 +101,28 @@ public sealed partial class MainWindow : Window
 
         // Intercept close to minimize to tray instead
         this.AppWindow.Closing += AppWindow_Closing;
-        this.Activated += (_, _) => RootGrid.Focus(FocusState.Programmatic);
+        this.Activated += OnFirstActivated;
 
-        LoadMonitors();
         RootGrid.Focus(FocusState.Programmatic);
+    }
 
-        // Show first-launch hotkey dialog
-        if (!_settings.FirstLaunchHotkeyDialogShown)
+    private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
+    {
+        this.Activated -= OnFirstActivated;
+
+        // Defer monitor enumeration until after the window is fully active.
+        // Some monitors (e.g. LS27A600U) fail DDC/CI queries when called
+        // too early during window construction.
+        DispatcherQueue.TryEnqueue(() =>
         {
-            _ = ShowFirstLaunchDialog();
-        }
+            LoadMonitors();
+            RootGrid.Focus(FocusState.Programmatic);
+
+            if (!_settings.FirstLaunchHotkeyDialogShown)
+            {
+                _ = ShowFirstLaunchDialog();
+            }
+        });
     }
 
     private void SubclassWindow()
@@ -203,6 +198,7 @@ public sealed partial class MainWindow : Window
     private void CloseApp()
     {
         _isClosing = true;
+        _identifyOverlays.Dismiss();
         _brightnessUpdates.Dispose();
         MonitorEnumerator.ReleaseMonitors(_monitors);
         _hotkeyManager.Dispose();
@@ -246,10 +242,7 @@ public sealed partial class MainWindow : Window
 
     private async void KeyboardHelpButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ContentDialog
-        {
-            Title = "Keyboard brightness controls",
-            Content = string.Join(Environment.NewLine, new[]
+        var helpText = string.Join(Environment.NewLine, new[]
             {
                 "Select a target:",
                 "  1-9: select a monitor",
@@ -266,7 +259,20 @@ public sealed partial class MainWindow : Window
                 "  Ctrl: 1%",
                 "  Shift: 10%",
                 "  Ctrl+Shift: 25%"
-            }),
+            });
+
+        var dialog = new ContentDialog
+        {
+            Title = "Keyboard brightness controls",
+            Content = new ScrollViewer
+            {
+                Content = new TextBlock
+                {
+                    Text = helpText,
+                    TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+                },
+                MaxHeight = 350,
+            },
             CloseButtonText = "Got it",
             XamlRoot = this.Content.XamlRoot,
         };
@@ -285,28 +291,7 @@ public sealed partial class MainWindow : Window
         }
         CloseToTrayToggle.IsOn = _settings.CloseToTray;
         MaxMonitorsNumberBox.Value = _settings.MaxVisibleMonitors;
-        ResizeWindowToContent();
-    }
-
-    private void ResizeWindowToContent()
-    {
-        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-        {
-            RootGrid.UpdateLayout();
-
-            var dpi = GetDpiForWindow(_hwnd);
-            double scale = dpi / 96.0;
-            double widthDips = Math.Max(GetClientWidthPixels() / scale, 1);
-
-            RootGrid.Measure(new Windows.Foundation.Size(widthDips, double.PositiveInfinity));
-            int targetHeight = Math.Max((int)Math.Ceiling(RootGrid.DesiredSize.Height * scale), 200);
-
-            var currentSize = this.AppWindow.Size;
-            int clientHeight = GetClientHeightPixels();
-            int outerTargetHeight = currentSize.Height + (targetHeight - clientHeight);
-            if (Math.Abs(clientHeight - targetHeight) > 1)
-                this.AppWindow.Resize(new SizeInt32(Math.Max(currentSize.Width, DefaultWindowWidth), Math.Max(outerTargetHeight, 200)));
-        });
+        _windowSizer.ResizeToContent(RootGrid);
     }
 
     private void CloseToTrayToggle_Toggled(object sender, RoutedEventArgs e)
@@ -319,7 +304,7 @@ public sealed partial class MainWindow : Window
     {
         SettingsOverlay.Visibility = Visibility.Collapsed;
         _isRecordingHotkey = false;
-        ResizeWindowToFit(_monitors.Count);
+        _windowSizer.ResizeToFit(RootGrid, MonitorPanel, MonitorScrollViewer, _monitors.Count, _settings.MaxVisibleMonitors);
     }
 
     private void HotkeyTextBox_GotFocus(object sender, RoutedEventArgs e)
@@ -401,7 +386,7 @@ public sealed partial class MainWindow : Window
         if (double.IsNaN(args.NewValue)) return;
         _settings.MaxVisibleMonitors = (int)args.NewValue;
         _settings.Save();
-        ResizeWindowToFit(_monitors.Count);
+        _windowSizer.ResizeToFit(RootGrid, MonitorPanel, MonitorScrollViewer, _monitors.Count, _settings.MaxVisibleMonitors);
     }
 
     #endregion
@@ -413,164 +398,39 @@ public sealed partial class MainWindow : Window
         if (SettingsOverlay.Visibility == Visibility.Visible)
             return;
 
-        int? monitorNumber = GetMonitorNumberFromKey(e.Key);
-        if (monitorNumber.HasValue)
-        {
-            if (monitorNumber.Value == 0)
-                SelectAllMonitors();
-            else
-                SelectMonitor(monitorNumber.Value - 1);
-
-            e.Handled = true;
-            return;
-        }
-
-        int keyCode = (int)e.Key;
-        bool handled = true;
-        if (e.Key == VirtualKey.A)
-        {
-            SelectAllMonitors();
-        }
-        else if (e.Key == VirtualKey.Up || e.Key == VirtualKey.Right || e.Key == VirtualKey.PageUp ||
-                 keyCode == 0x6B || keyCode == 0xBB) // VK_ADD / VK_OEM_PLUS
-        {
-            AdjustSelectedBrightness(GetKeyboardStep(e.Key));
-        }
-        else if (e.Key == VirtualKey.Down || e.Key == VirtualKey.Left || e.Key == VirtualKey.PageDown ||
-                 keyCode == 0x6D || keyCode == 0xBD) // VK_SUBTRACT / VK_OEM_MINUS
-        {
-            AdjustSelectedBrightness(-GetKeyboardStep(e.Key));
-        }
-        else if (e.Key == VirtualKey.Home)
-        {
-            SetSelectedBrightnessToLimit(useMaximum: false);
-        }
-        else if (e.Key == VirtualKey.End)
-        {
-            SetSelectedBrightnessToLimit(useMaximum: true);
-        }
-        else
-        {
-            handled = false;
-        }
-
-        e.Handled = handled;
+        e.Handled = _keyboardController.HandleKeyDown(e);
     }
 
-    private static int? GetMonitorNumberFromKey(VirtualKey key)
-    {
-        int keyCode = (int)key;
-        if (keyCode >= 0x30 && keyCode <= 0x39)
-            return keyCode - 0x30;
-        if (keyCode >= 0x60 && keyCode <= 0x69)
-            return keyCode - 0x60;
-        return null;
-    }
-
-    private static bool IsKeyDown(VirtualKey key)
-    {
-        return Microsoft.UI.Input.InputKeyboardSource
-            .GetKeyStateForCurrentThread(key)
-            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-    }
-
-    private static int GetKeyboardStep(VirtualKey key)
-    {
-        if (key == VirtualKey.PageUp || key == VirtualKey.PageDown)
-            return 10;
-
-        bool ctrl = IsKeyDown(VirtualKey.Control);
-        bool shift = IsKeyDown(VirtualKey.Shift);
-
-        if (ctrl && shift) return 25;
-        if (shift) return 10;
-        if (ctrl) return 1;
-        return 5;
-    }
-
-    private void SelectMonitor(int monitorIndex)
-    {
-        if (!_monitorControls.Any(control => control.Monitor.Index == monitorIndex))
-            return;
-
-        _selectedMonitorIndex = monitorIndex;
-        _allMonitorsSelected = false;
-        UpdateMonitorSelectionVisuals();
-    }
-
-    private void SelectAllMonitors()
-    {
-        if (!_monitorControls.Any(control => control.Slider is not null))
-            return;
-
-        _selectedMonitorIndex = null;
-        _allMonitorsSelected = true;
-        UpdateMonitorSelectionVisuals();
-    }
-
-    private IEnumerable<MonitorUi> GetSelectedMonitorControls()
-    {
-        if (_allMonitorsSelected)
-            return _monitorControls.Where(control => control.Slider is not null);
-
-        if (_selectedMonitorIndex.HasValue)
-        {
-            return _monitorControls.Where(control =>
-                control.Monitor.Index == _selectedMonitorIndex.Value && control.Slider is not null);
-        }
-
-        return Enumerable.Empty<MonitorUi>();
-    }
-
-    private void AdjustSelectedBrightness(int delta)
-    {
-        foreach (var control in GetSelectedMonitorControls())
-        {
-            var slider = control.Slider!;
-            int next = Math.Clamp((int)Math.Round(slider.Value) + delta,
-                control.Monitor.MinBrightness, control.Monitor.MaxBrightness);
-            slider.Value = next;
-        }
-    }
-
-    private void SetSelectedBrightnessToLimit(bool useMaximum)
-    {
-        foreach (var control in GetSelectedMonitorControls())
-        {
-            control.Slider!.Value = useMaximum
-                ? control.Monitor.MaxBrightness
-                : control.Monitor.MinBrightness;
-        }
-    }
-
-    private void UpdateMonitorSelectionVisuals()
-    {
-        var selectedBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 96, 200, 255));
-        var defaultBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
-
-        foreach (var control in _monitorControls)
-        {
-            bool isSelected = _allMonitorsSelected
-                ? control.Slider is not null
-                : _selectedMonitorIndex.HasValue && control.Monitor.Index == _selectedMonitorIndex.Value;
-            control.Card.BorderBrush = isSelected ? selectedBrush : defaultBrush;
-            control.Card.BorderThickness = isSelected ? new Thickness(2) : new Thickness(1);
-        }
-    }
+    private int _monitorRetryCount;
 
     private void LoadMonitors()
     {
         _brightnessUpdates.Dispose();
         _brightnessUpdates = new BrightnessUpdateQueue();
+        _cardFactory = new MonitorCardFactory(_brightnessUpdates, _keyboardController.SelectMonitor);
         MonitorEnumerator.ReleaseMonitors(_monitors);
         MonitorPanel.Children.Clear();
         _monitorControls.Clear();
         _monitors = MonitorEnumerator.GetMonitors();
 
+        // If any monitor with a physical handle failed DDC/CI brightness detection,
+        // schedule an automatic retry. Some monitors need the handles to be released
+        // and re-acquired with the message pump running in between.
+        if (_monitorRetryCount < 3 &&
+            _monitors.Any(m => m.PhysicalMonitorHandle != IntPtr.Zero && !m.SupportsBrightness))
+        {
+            _monitorRetryCount++;
+            _ = RetryLoadMonitorsAsync();
+        }
+        else
+        {
+            _monitorRetryCount = 0;
+        }
+
         if (_monitors.Count == 0)
         {
             EmptyState.Visibility = Visibility.Visible;
-            ResizeWindowToFit(0);
+            _windowSizer.ResizeToFit(RootGrid, MonitorPanel, MonitorScrollViewer, 0, _settings.MaxVisibleMonitors);
             return;
         }
 
@@ -578,251 +438,19 @@ public sealed partial class MainWindow : Window
 
         foreach (var monitor in _monitors)
         {
-            MonitorPanel.Children.Add(CreateMonitorCard(monitor));
+            var (element, control) = _cardFactory.Create(monitor);
+            MonitorPanel.Children.Add(element);
+            _monitorControls.Add(control);
         }
 
-        if (_monitorControls.Any(control => control.Slider is not null))
-        {
-            _selectedMonitorIndex = _monitorControls.First(control => control.Slider is not null).Monitor.Index;
-            _allMonitorsSelected = false;
-            UpdateMonitorSelectionVisuals();
-        }
-
-        ResizeWindowToFit(_monitors.Count);
+        _keyboardController.SelectFirstBrightnessCapable();
+        _windowSizer.ResizeToFit(RootGrid, MonitorPanel, MonitorScrollViewer, _monitors.Count, _settings.MaxVisibleMonitors);
     }
 
-    private void ResizeWindowToFit(int monitorCount)
+    private async Task RetryLoadMonitorsAsync()
     {
-        int visibleCount = Math.Min(monitorCount, _settings.MaxVisibleMonitors);
-        if (visibleCount == 0) visibleCount = 1;
-
-        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-        {
-            AutoSizeWindowToContent(visibleCount, monitorCount > _settings.MaxVisibleMonitors, 0);
-        });
-    }
-
-    private void AutoSizeWindowToContent(int visibleCount, bool shouldScroll, int pass)
-    {
-        RootGrid.UpdateLayout();
-        MonitorPanel.UpdateLayout();
-
-        if (shouldScroll)
-        {
-            MonitorScrollViewer.Height = GetVisibleMonitorListHeight(visibleCount);
-            MonitorScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-        }
-        else
-        {
-            // When all tiles should fit, do not turn the ScrollViewer into a viewport.
-            // Let it measure to full content height so the last card cannot be clipped.
-            MonitorScrollViewer.Height = double.NaN;
-            MonitorScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
-        }
-
-        MonitorScrollViewer.InvalidateMeasure();
-        RootGrid.InvalidateMeasure();
-
-        var dpi = GetDpiForWindow(_hwnd);
-        double scale = dpi / 96.0;
-        double widthDips = Math.Max(GetClientWidthPixels() / scale, 1);
-
-        RootGrid.Measure(new Windows.Foundation.Size(widthDips, double.PositiveInfinity));
-        _targetClientHeightPixels = Math.Max((int)Math.Ceiling(RootGrid.DesiredSize.Height * scale), 200);
-
-        var currentSize = this.AppWindow.Size;
-        int clientHeight = GetClientHeightPixels();
-        int outerTargetHeight = currentSize.Height + (_targetClientHeightPixels - clientHeight);
-        if (Math.Abs(clientHeight - _targetClientHeightPixels) > 1)
-            this.AppWindow.Resize(new SizeInt32(Math.Max(currentSize.Width, DefaultWindowWidth), Math.Max(outerTargetHeight, 200)));
-
-        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-            VerifyAutoSize(shouldScroll, pass));
-    }
-
-    private double GetVisibleMonitorListHeight(int visibleCount)
-    {
-        double totalHeight = 0;
-        int count = 0;
-        foreach (FrameworkElement child in MonitorPanel.Children.Cast<FrameworkElement>())
-        {
-            if (count >= visibleCount) break;
-
-            child.UpdateLayout();
-            double height = child.ActualHeight;
-            if (height <= 0)
-            {
-                child.Measure(new Windows.Foundation.Size(MonitorScrollViewer.ActualWidth, double.PositiveInfinity));
-                height = child.DesiredSize.Height;
-            }
-
-            totalHeight += height > 0 ? height : 80;
-            count++;
-        }
-
-        if (count > 1)
-            totalHeight += (count - 1) * 8; // StackPanel spacing between visible cards only.
-
-        return Math.Ceiling(totalHeight);
-    }
-
-    private void VerifyAutoSize(bool shouldScroll, int pass)
-    {
-        if (pass >= 5)
-            return;
-
-        int clientHeight = GetClientHeightPixels();
-        int deltaPixels = _targetClientHeightPixels - clientHeight;
-        if (Math.Abs(deltaPixels) <= 1)
-            return;
-
-        var currentSize = this.AppWindow.Size;
-        this.AppWindow.Resize(new SizeInt32(Math.Max(currentSize.Width, DefaultWindowWidth), Math.Max(currentSize.Height + deltaPixels, 200)));
-
-        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-            VerifyAutoSize(shouldScroll, pass + 1));
-    }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern uint GetDpiForWindow(IntPtr hwnd);
-
-    private int GetClientHeightPixels()
-    {
-        return GetClientRect(_hwnd, out var rect) ? rect.Bottom - rect.Top : this.AppWindow.Size.Height;
-    }
-
-    private int GetClientWidthPixels()
-    {
-        return GetClientRect(_hwnd, out var rect) ? rect.Right - rect.Left : this.AppWindow.Size.Width;
-    }
-
-    private UIElement CreateMonitorCard(MonitorDevice monitor)
-    {
-        var card = new Border
-        {
-            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(14, 10, 14, 10),
-        };
-        card.PointerPressed += (_, _) => SelectMonitor(monitor.Index);
-
-        var stack = new StackPanel { Spacing = 4 };
-        Slider? slider = null;
-        TextBlock? pctText = null;
-
-        // Single row: badge + name + resolution
-        var topRow = new Grid();
-        topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        var badge = new Border
-        {
-            Background = new SolidColorBrush(ColorHelper.FromArgb(255, 55, 90, 180)),
-            CornerRadius = new CornerRadius(3),
-            Padding = new Thickness(6, 1, 6, 1),
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 10, 0),
-            Child = new TextBlock
-            {
-                Text = (monitor.Index + 1).ToString(),
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                Foreground = new SolidColorBrush(Colors.White),
-                FontSize = 12,
-            }
-        };
-        Grid.SetColumn(badge, 0);
-        topRow.Children.Add(badge);
-
-        var nameBlock = new TextBlock
-        {
-            Text = monitor.DisplayName,
-            FontSize = 14,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-        };
-        Grid.SetColumn(nameBlock, 1);
-        topRow.Children.Add(nameBlock);
-
-        var detailsBlock = new TextBlock
-        {
-            Text = $"{monitor.Resolution}",
-            Opacity = 0.5,
-            FontSize = 11,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0),
-        };
-        Grid.SetColumn(detailsBlock, 2);
-        topRow.Children.Add(detailsBlock);
-
-        stack.Children.Add(topRow);
-
-        if (!monitor.SupportsBrightness)
-        {
-            var warning = new TextBlock
-            {
-                Text = "⚠ DDC/CI not supported",
-                Opacity = 0.6,
-                FontSize = 11,
-                FontStyle = Windows.UI.Text.FontStyle.Italic,
-                Margin = new Thickness(0, 2, 0, 0),
-            };
-            stack.Children.Add(warning);
-        }
-        else
-        {
-            // Compact brightness slider row
-            var sliderRow = new Grid { Margin = new Thickness(0, 4, 0, 0) };
-            sliderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            sliderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            slider = new Slider
-            {
-                Minimum = monitor.MinBrightness,
-                Maximum = monitor.MaxBrightness,
-                Value = monitor.CurrentBrightness,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Height = 32,
-            };
-
-            pctText = new TextBlock
-            {
-                Text = $"{monitor.CurrentBrightness}%",
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 13,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0),
-                MinWidth = 40,
-                TextAlignment = TextAlignment.Right,
-            };
-
-            slider.ValueChanged += (s, e) =>
-            {
-                var val = (int)e.NewValue;
-                monitor.CurrentBrightness = val;
-                pctText.Text = $"{val}%";
-                _brightnessUpdates.SetLatest(monitor.PhysicalMonitorHandle, monitor.DisplayName, val);
-            };
-
-            Grid.SetColumn(slider, 0);
-            Grid.SetColumn(pctText, 1);
-            sliderRow.Children.Add(slider);
-            sliderRow.Children.Add(pctText);
-            stack.Children.Add(sliderRow);
-        }
-
-        card.Child = stack;
-        _monitorControls.Add(new MonitorUi
-        {
-            Monitor = monitor,
-            Card = card,
-            Slider = slider,
-            PercentLabel = pctText
-        });
-        return card;
+        await Task.Delay(1000);
+        LoadMonitors();
     }
 
     private void RefreshButton_Click(object sender, RoutedEventArgs e)
@@ -832,39 +460,7 @@ public sealed partial class MainWindow : Window
 
     private void IdentifyButton_Click(object sender, RoutedEventArgs e)
     {
-        DismissIdentifyOverlays();
-
-        foreach (var monitor in _monitors)
-        {
-            var win = new IdentifyWindow(monitor);
-            win.Activate();
-            _identifyWindows.Add(win);
-        }
-
-        _identifyTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-        _identifyTimer.Tick += (s, args) =>
-        {
-            _identifyTimer.Stop();
-            DismissIdentifyOverlays();
-        };
-        _identifyTimer.Start();
-    }
-
-    private void DismissIdentifyOverlays()
-    {
-        _identifyTimer?.Stop();
-        foreach (var win in _identifyWindows)
-        {
-            try
-            {
-                win.Close();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("Unable to close identify overlay", ex);
-            }
-        }
-        _identifyWindows.Clear();
+        _identifyOverlays.Show(_monitors, DispatcherQueue);
     }
 
     #endregion
