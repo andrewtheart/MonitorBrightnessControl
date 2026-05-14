@@ -79,7 +79,8 @@
         <Grid x:Name="SettingsOverlay" Grid.Row="1" Grid.RowSpan="2" 
               Visibility="Collapsed" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
               Padding="24,0,24,24">
-            <StackPanel MaxWidth="500" VerticalAlignment="Top" Spacing="16" Margin="0,20,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxWidth="500" VerticalAlignment="Top" Margin="0,20,0,0" MaxHeight="360">
+            <StackPanel Spacing="16">
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Button Click="SettingsBack_Click">
                         <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE72B;" FontSize="14"/>
@@ -179,6 +180,7 @@
                                Margin="0,8,0,0" MaxWidth="160" HorizontalAlignment="Left"/>
                 </StackPanel>
             </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </Window>
