@@ -123,6 +123,9 @@ public sealed partial class MainWindow : Window
                 App.OverridePosition ?? _settings.StartPosition,
                 App.OverrideDisplay ?? _settings.StartDisplay);
 
+            // Ensure the window is in the foreground
+            SetForegroundWindow(_hwnd);
+
             if (!_settings.FirstLaunchHotkeyDialogShown)
             {
                 _ = ShowFirstLaunchDialog();

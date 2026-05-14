@@ -35,6 +35,9 @@ internal sealed class DialogWindow
         public int Left, Top, Right, Bottom;
     }
 
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
     private const uint MONITOR_DEFAULTTONEAREST = 2;
 
     private readonly TaskCompletionSource<bool> _tcs = new();
@@ -204,6 +207,7 @@ internal sealed class DialogWindow
         _window.Closed += (_, _) => _tcs.TrySetResult(true);
 
         _window.Activate();
+        SetForegroundWindow(hwnd);
         await _tcs.Task;
         return _result;
     }
