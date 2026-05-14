@@ -42,6 +42,17 @@ Microsoft.WindowsAppSDK 2.0.1
 - Windows C++ build tools required by Native AOT publishing.
 - A supported runtime identifier, for example `win-x64`.
 
+## Dependencies
+
+The only external NuGet dependency is **Microsoft.WindowsAppSDK 2.0.1** (WinUI 3), which provides the UI framework, windowing, and XAML runtime.
+
+All other functionality uses built-in Windows and .NET APIs:
+
+- **DDC/CI brightness control** — `dxva2.dll` (`GetMonitorBrightness`, `SetMonitorBrightness`, `SetVCPFeature`)
+- **Window management** — `user32.dll` (subclassing, foreground, DPI)
+- **System tray icon** — `shell32.dll` (`Shell_NotifyIcon`)
+- **Monitor EDID names** — Windows Setup API / registry
+
 ## WinUI 3 app features
 
 - Per-monitor brightness sliders.
