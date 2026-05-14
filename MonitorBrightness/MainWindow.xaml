@@ -1,0 +1,132 @@
+<Window
+    x:Class="MonitorBrightness.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:MonitorBrightness"
+    Title="Monitor Brightness Control">
+
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+          IsTabStop="True" KeyDown="RootGrid_KeyDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Custom title bar drag region -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="16,0,0,0"
+              Background="Transparent">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE7F4;" FontSize="14"/>
+                <TextBlock Text="Monitor Brightness Control" 
+                           VerticalAlignment="Center" 
+                           Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.8"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Header -->
+        <Grid x:Name="HeaderBar" Grid.Row="1" Margin="24,4,24,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="🖥️ Monitor Brightness" 
+                       FontSize="22" FontWeight="SemiBold"
+                       VerticalAlignment="Center"/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="IdentifyButton" Click="IdentifyButton_Click"
+                        ToolTipService.ToolTip="Show number overlay on each monitor">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE7B3;" FontSize="14"/>
+                        <TextBlock Text="Identify"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="RefreshButton" Click="RefreshButton_Click"
+                        ToolTipService.ToolTip="Re-detect monitors">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE72C;" FontSize="14"/>
+                        <TextBlock Text="Refresh"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="KeyboardHelpButton" Click="KeyboardHelpButton_Click"
+                        ToolTipService.ToolTip="Keyboard brightness controls">
+                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE897;" FontSize="14"/>
+                </Button>
+                <Button x:Name="SettingsButton" Click="SettingsButton_Click"
+                        ToolTipService.ToolTip="Settings">
+                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE713;" FontSize="14"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Monitor List -->
+        <ScrollViewer x:Name="MonitorScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                      Padding="24,0,24,10" VerticalAlignment="Top">
+            <StackPanel x:Name="MonitorPanel" Spacing="8"/>
+        </ScrollViewer>
+
+        <!-- Empty state -->
+        <TextBlock x:Name="EmptyState" Grid.Row="2" 
+                   Text="No monitors with DDC/CI brightness control detected.&#x0a;&#x0a;Note: Laptop built-in displays and some monitors don't support DDC/CI."
+                   Visibility="Collapsed"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   TextAlignment="Center" Opacity="0.6"
+                   Style="{StaticResource BodyTextBlockStyle}"/>
+
+        <!-- Settings Panel (overlay) -->
+        <Grid x:Name="SettingsOverlay" Grid.Row="1" Grid.RowSpan="2" 
+              Visibility="Collapsed" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+              Padding="24,0,24,24">
+            <StackPanel MaxWidth="500" VerticalAlignment="Top" Spacing="16" Margin="0,20,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Click="SettingsBack_Click">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE72B;" FontSize="14"/>
+                    </Button>
+                    <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Hotkey Section -->
+                <StackPanel Spacing="8" Padding="16" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <TextBlock Text="Global Hotkey" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock Text="Press this key combination from anywhere to bring the app to the foreground."
+                               Opacity="0.7" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"/>
+                    
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBox x:Name="HotkeyTextBox" Grid.Column="0" 
+                                 PlaceholderText="Click and press a key combination..." 
+                                 IsReadOnly="True" GotFocus="HotkeyTextBox_GotFocus"
+                                 KeyDown="HotkeyTextBox_KeyDown"/>
+                        <Button x:Name="ClearHotkeyButton" Grid.Column="1" 
+                                Content="Clear" Margin="8,0,0,0" Click="ClearHotkey_Click"/>
+                    </Grid>
+                    <TextBlock x:Name="HotkeyStatus" Text="" Opacity="0.7" 
+                               Style="{StaticResource CaptionTextBlockStyle}"/>
+                </StackPanel>
+
+                <!-- Max Visible Monitors Section -->
+                <StackPanel Spacing="8" Padding="16" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <TextBlock Text="Window Height" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock Text="Maximum number of monitors to show before scrolling. The window height adapts dynamically up to this limit."
+                               Opacity="0.7" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"/>
+                    
+                    <NumberBox x:Name="MaxMonitorsNumberBox" 
+                               Minimum="1" Maximum="20"
+                               SpinButtonPlacementMode="Inline"
+                               ValueChanged="MaxMonitorsNumberBox_ValueChanged"
+                               Margin="0,8,0,0" MaxWidth="160" HorizontalAlignment="Left"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

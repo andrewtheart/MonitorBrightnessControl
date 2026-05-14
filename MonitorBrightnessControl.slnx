@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MonitorBrightness.Tests/MonitorBrightness.Tests.csproj" />
+  <Project Path="MonitorBrightness/MonitorBrightness.csproj" />
+</Solution>

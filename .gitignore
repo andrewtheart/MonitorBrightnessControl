@@ -1,0 +1,40 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+publish/
+
+# User-specific IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test and coverage outputs
+TestResults/
+CoverageResults/
+coverage/
+*.coverage
+*.coveragexml
+coverage.cobertura.xml
+
+# Logs and local runtime state
+*.log
+monitor_brightness_settings.json
+monitor_brightness_settings.json.tmp
+
+# Native AOT/debug artifacts
+*.pdb
+*.ilk
+*.map
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
