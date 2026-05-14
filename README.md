@@ -2,6 +2,8 @@
 
 A Windows app for adjusting brightness independently for each attached monitor using DDC/CI.
 
+![Monitor Brightness Control](screenshot.png)
+
 ## Versions
 
 - `MonitorBrightness\` - WinUI 3 / .NET 10 app.
