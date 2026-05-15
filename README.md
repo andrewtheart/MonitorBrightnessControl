@@ -21,7 +21,7 @@ This project is licensed under the MIT License. See `LICENSE`.
 - Windows App Runtime 2.x installed. The app uses Windows App SDK `2.0.1`.
 - External monitors must support DDC/CI brightness control for the sliders/CLI brightness commands to work.
 
-The published app is self-contained and Native AOT compiled, so it does not require installing the .NET runtime separately. The AOT version also starts significantly faster than a standard JIT build because the code is compiled ahead of time and skips JIT compilation at startup.
+The published app is self-contained and Native AOT compiled, so it does not require installing the .NET runtime separately. The AOT version also starts significantly faster than a standard JIT build.
 
 ### Building or running from source
 
@@ -110,14 +110,14 @@ Or use the convenience scripts:
 Published executable examples:
 
 ```powershell
-MonitorBrightness.exe --list
-MonitorBrightness.exe --get 2
-MonitorBrightness.exe --set 1 75
-MonitorBrightness.exe --set all 50
-MonitorBrightness.exe --set 1,3 75
-MonitorBrightness.exe --set 1-4 60
-MonitorBrightness.exe --set 1 3 4 80
-MonitorBrightness.exe --identify
+MonitorBrightness.exe --list           # List all detected monitors and show their current brightness levels
+MonitorBrightness.exe --get 2          # Show the current brightness for monitor 2
+MonitorBrightness.exe --set 1 75       # Set monitor 1 brightness to 75%
+MonitorBrightness.exe --set all 50     # Set all brightness-capable monitors to 50%
+MonitorBrightness.exe --set 1,3 75     # Set monitors 1 and 3 to 75%
+MonitorBrightness.exe --set 1-4 60     # Set monitors 1 through 4 to 60%
+MonitorBrightness.exe --set 1 3 4 80   # Set monitors 1, 3, and 4 to 80% using space-separated targets
+MonitorBrightness.exe --identify       # Print monitor identification information to help match monitor numbers
 ```
 
 Commands:
@@ -165,4 +165,4 @@ MonitorBrightness\bin\Release\net10.0-windows10.0.26100.0\win-x64\publish\Monito
 
 ## Notes
 
-Brightness control requires DDC/CI support from the monitor and connection path. Most external monitors connected via DisplayPort or HDMI support this, but some displays, adapters, docks, or laptop built-in panels may not.
+Brightness control requires DDC/CI support from the monitor and connection path. Most external monitors connected via DisplayPort or HDMI support this, but some displays, adapters, docks, or laptop internal panels do not expose DDC/CI brightness control.
