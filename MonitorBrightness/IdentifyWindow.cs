@@ -38,7 +38,7 @@ public sealed partial class IdentifyWindow : Window
     private const uint SWP_NOZORDER = 0x0004;
 
     // Badge dimensions
-    private const int BadgeWidth = 280;
+    private const int BadgeWidth = 360;
     private const int BadgeHeight = 320;
 
     public IdentifyWindow(MonitorDevice monitor)
@@ -72,6 +72,9 @@ public sealed partial class IdentifyWindow : Window
             FontSize = 22,
             Foreground = new SolidColorBrush(Colors.White),
             HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = Microsoft.UI.Xaml.TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 280,
             Margin = new Thickness(0, 4, 0, 0),
         };
         numberStack.Children.Add(nameText);
