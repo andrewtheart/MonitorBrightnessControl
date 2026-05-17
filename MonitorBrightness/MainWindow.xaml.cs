@@ -454,7 +454,7 @@ public sealed partial class MainWindow : Window
         MonitorEnumerator.ReleaseMonitors(_monitors);
         MonitorPanel.Children.Clear();
         _monitorControls.Clear();
-        _monitors = MonitorEnumerator.GetMonitors();
+        _monitors = App.DemoMonitors ?? MonitorEnumerator.GetMonitors();
 
         // If any monitor with a physical handle failed DDC/CI brightness detection,
         // schedule an automatic retry. Some monitors need the handles to be released

@@ -12,6 +12,9 @@ public partial class App : Application
     /// <summary>CLI override for display number (null = use settings).</summary>
     public static int? OverrideDisplay { get; set; }
 
+    /// <summary>When set, the app uses these simulated monitors instead of real DDC/CI enumeration.</summary>
+    public static List<MonitorDevice>? DemoMonitors { get; set; }
+
     public App()
     {
         this.InitializeComponent();
