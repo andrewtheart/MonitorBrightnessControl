@@ -263,7 +263,10 @@ public sealed partial class MainWindow : Window
                 "  Default: 5%",
                 "  Ctrl: 1%",
                 "  Shift: 10%",
-                "  Ctrl+Shift: 25%"
+                "  Ctrl+Shift: 25%",
+                "",
+                "Other:",
+                "  F1: show this help"
             });
 
         var content = new TextBlock
@@ -440,6 +443,13 @@ public sealed partial class MainWindow : Window
     {
         if (SettingsOverlay.Visibility == Visibility.Visible)
             return;
+
+        if (e.Key == Windows.System.VirtualKey.F1)
+        {
+            e.Handled = true;
+            KeyboardHelpButton_Click(this, e);
+            return;
+        }
 
         e.Handled = _keyboardController.HandleKeyDown(e);
     }
