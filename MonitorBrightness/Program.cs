@@ -39,6 +39,16 @@ public static class Program
 
     private static void ParseGuiFlags(string[] args)
     {
+        var (position, display) = ParseGuiOverrides(args);
+        if (position.HasValue) App.OverridePosition = position.Value;
+        if (display.HasValue) App.OverrideDisplay = display.Value;
+    }
+
+    internal static (WindowPosition? position, int? display) ParseGuiOverrides(string[] args)
+    {
+        WindowPosition? position = null;
+        int? display = null;
+
         for (int i = 0; i < args.Length; i++)
         {
             var arg = args[i].ToLowerInvariant().TrimStart('-', '/');
@@ -46,15 +56,17 @@ public static class Program
             if (arg is "position" or "pos" or "p" && i + 1 < args.Length)
             {
                 if (Enum.TryParse<WindowPosition>(args[i + 1], ignoreCase: true, out var pos))
-                    App.OverridePosition = pos;
+                    position = pos;
                 i++;
             }
             else if (arg is "display" or "d" && i + 1 < args.Length)
             {
-                if (int.TryParse(args[i + 1], out int display))
-                    App.OverrideDisplay = display;
+                if (int.TryParse(args[i + 1], out int d))
+                    display = d;
                 i++;
             }
         }
+
+        return (position, display);
     }
 }

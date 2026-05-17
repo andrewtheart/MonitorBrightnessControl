@@ -545,35 +545,45 @@ public sealed partial class MainWindow : Window
         var work = workAreas[idx];
 
         var windowSize = this.AppWindow.Size;
-        int w = windowSize.Width;
-        int h = windowSize.Height;
 
-        int areaW = work.Right - work.Left;
-        int areaH = work.Bottom - work.Top;
+        var (x, y) = CalculateWindowPosition(position,
+            work.Left, work.Top, work.Right, work.Bottom,
+            windowSize.Width, windowSize.Height);
+
+        this.AppWindow.Move(new PointInt32(x, y));
+    }
+
+    internal static (int x, int y) CalculateWindowPosition(
+        WindowPosition position,
+        int workLeft, int workTop, int workRight, int workBottom,
+        int windowWidth, int windowHeight)
+    {
+        int areaW = workRight - workLeft;
+        int areaH = workBottom - workTop;
 
         int x = position switch
         {
             WindowPosition.TopLeft or WindowPosition.MiddleLeft or WindowPosition.BottomLeft
-                => work.Left + EdgeOffset,
+                => workLeft + EdgeOffset,
             WindowPosition.TopCenter or WindowPosition.Center or WindowPosition.BottomCenter
-                => work.Left + (areaW - w) / 2,
+                => workLeft + (areaW - windowWidth) / 2,
             WindowPosition.TopRight or WindowPosition.MiddleRight or WindowPosition.BottomRight
-                => work.Right - w - EdgeOffset,
-            _ => work.Left + (areaW - w) / 2,
+                => workRight - windowWidth - EdgeOffset,
+            _ => workLeft + (areaW - windowWidth) / 2,
         };
 
         int y = position switch
         {
             WindowPosition.TopLeft or WindowPosition.TopCenter or WindowPosition.TopRight
-                => work.Top + EdgeOffset,
+                => workTop + EdgeOffset,
             WindowPosition.MiddleLeft or WindowPosition.Center or WindowPosition.MiddleRight
-                => work.Top + (areaH - h) / 2,
+                => workTop + (areaH - windowHeight) / 2,
             WindowPosition.BottomLeft or WindowPosition.BottomCenter or WindowPosition.BottomRight
-                => work.Bottom - h - EdgeOffset,
-            _ => work.Top + (areaH - h) / 2,
+                => workBottom - windowHeight - EdgeOffset,
+            _ => workTop + (areaH - windowHeight) / 2,
         };
 
-        this.AppWindow.Move(new PointInt32(x, y));
+        return (x, y);
     }
 
     #endregion

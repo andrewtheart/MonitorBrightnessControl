@@ -34,6 +34,26 @@ internal sealed class WindowSizer
         _defaultWidth = defaultWidth;
     }
 
+    /// <summary>
+    /// Computes the target outer window height given the current outer height,
+    /// the current client height, and the desired client height.
+    /// </summary>
+    internal static int CalculateOuterHeight(int currentOuterHeight, int currentClientHeight, int targetClientHeight, int defaultWidth, int currentWidth)
+    {
+        int outerTarget = currentOuterHeight + (targetClientHeight - currentClientHeight);
+        return Math.Max(outerTarget, 200);
+    }
+
+    /// <summary>
+    /// Returns how many pixels the window still needs to grow or shrink,
+    /// or null when the window is already within 1 px of the target.
+    /// </summary>
+    internal static int? GetResizeDelta(int targetClientHeight, int currentClientHeight)
+    {
+        int delta = targetClientHeight - currentClientHeight;
+        return Math.Abs(delta) <= 1 ? null : delta;
+    }
+
     public void ResizeToFit(Grid rootGrid, StackPanel monitorPanel, ScrollViewer scrollViewer, int monitorCount, int maxVisibleMonitors)
     {
         int visibleCount = Math.Min(monitorCount, maxVisibleMonitors);
@@ -128,6 +148,39 @@ internal sealed class WindowSizer
             totalHeight += (count - 1) * 8;
 
         return Math.Ceiling(totalHeight);
+    }
+
+    /// <summary>
+    /// Pure calculation: sum the first <paramref name="visibleCount"/> item heights
+    /// (using <paramref name="fallbackHeight"/> when an item reports zero),
+    /// add inter-item spacing, and ceiling the result.
+    /// </summary>
+    internal static double CalculateListHeight(
+        IReadOnlyList<double> itemHeights, int visibleCount, double spacing = 8, double fallbackHeight = 80)
+    {
+        double totalHeight = 0;
+        int count = 0;
+        foreach (var height in itemHeights)
+        {
+            if (count >= visibleCount)
+                break;
+            totalHeight += height > 0 ? height : fallbackHeight;
+            count++;
+        }
+        if (count > 1)
+            totalHeight += (count - 1) * spacing;
+        return Math.Ceiling(totalHeight);
+    }
+
+    /// <summary>
+    /// Returns true when the auto-size loop should continue (pass limit not reached
+    /// and the client height still differs from the target by more than 1 px).
+    /// </summary>
+    internal static bool ShouldRetryAutoSize(int pass, int targetClientHeight, int currentClientHeight, int maxPasses = 5)
+    {
+        if (pass >= maxPasses)
+            return false;
+        return Math.Abs(targetClientHeight - currentClientHeight) > 1;
     }
 
     private void VerifyAutoSize(Grid rootGrid, bool shouldScroll, int pass)

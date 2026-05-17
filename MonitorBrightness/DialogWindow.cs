@@ -215,16 +215,21 @@ internal sealed class DialogWindow
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+    internal static (int x, int y) CalculateCenter(
+        int ownerLeft, int ownerTop, int ownerRight, int ownerBottom,
+        int dialogWidth, int dialogHeight)
+    {
+        int ownerCenterX = (ownerLeft + ownerRight) / 2;
+        int ownerCenterY = (ownerTop + ownerBottom) / 2;
+        return (ownerCenterX - dialogWidth / 2, ownerCenterY - dialogHeight / 2);
+    }
+
     private static void CenterOnOwnerWindow(IntPtr dialogHwnd, IntPtr ownerHwnd, int w, int h)
     {
         if (!GetWindowRect(ownerHwnd, out var ownerRect))
             return;
 
-        int ownerCenterX = (ownerRect.Left + ownerRect.Right) / 2;
-        int ownerCenterY = (ownerRect.Top + ownerRect.Bottom) / 2;
-
-        int x = ownerCenterX - w / 2;
-        int y = ownerCenterY - h / 2;
+        var (x, y) = CalculateCenter(ownerRect.Left, ownerRect.Top, ownerRect.Right, ownerRect.Bottom, w, h);
 
         var appWindow = AppWindow.GetFromWindowId(Win32Interop.GetWindowIdFromWindow(dialogHwnd));
         appWindow.Move(new PointInt32(x, y));

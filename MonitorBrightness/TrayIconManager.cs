@@ -7,16 +7,16 @@ namespace MonitorBrightness;
 /// </summary>
 public class TrayIconManager : IDisposable
 {
-    private const int WM_TRAYICON = 0x8000 + 1;
+    internal const int WM_TRAYICON = 0x8000 + 1;
     private const int NIM_ADD = 0x00;
     private const int NIM_DELETE = 0x02;
     private const int NIF_ICON = 0x02;
     private const int NIF_TIP = 0x04;
     private const int NIF_MESSAGE = 0x01;
 
-    private const int WM_LBUTTONUP = 0x0202;
-    private const int WM_LBUTTONDBLCLK = 0x0203;
-    private const int WM_RBUTTONUP = 0x0205;
+    internal const int WM_LBUTTONUP = 0x0202;
+    internal const int WM_LBUTTONDBLCLK = 0x0203;
+    internal const int WM_RBUTTONUP = 0x0205;
 
     // Context menu constants
     private const uint MF_STRING = 0x0000;
@@ -27,6 +27,9 @@ public class TrayIconManager : IDisposable
 
     private const int IDM_OPEN = 1001;
     private const int IDM_CLOSE = 1002;
+
+    internal const int ContextMenuOpen = IDM_OPEN;
+    internal const int ContextMenuClose = IDM_CLOSE;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NOTIFYICONDATA
@@ -157,15 +160,7 @@ public class TrayIconManager : IDisposable
             int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
                 pt.X, pt.Y, 0, _hwnd, IntPtr.Zero);
 
-            switch (cmd)
-            {
-                case IDM_OPEN:
-                    OnTrayIconClicked?.Invoke();
-                    break;
-                case IDM_CLOSE:
-                    OnTrayIconCloseClicked?.Invoke();
-                    break;
-            }
+            ExecuteContextMenuCommand(cmd);
         }
         finally
         {
@@ -188,6 +183,19 @@ public class TrayIconManager : IDisposable
             AppLogger.Warn("Failed to remove system tray icon");
 
         _added = false;
+    }
+
+    internal void ExecuteContextMenuCommand(int command)
+    {
+        switch (command)
+        {
+            case IDM_OPEN:
+                OnTrayIconClicked?.Invoke();
+                break;
+            case IDM_CLOSE:
+                OnTrayIconCloseClicked?.Invoke();
+                break;
+        }
     }
 
     public void Dispose()
