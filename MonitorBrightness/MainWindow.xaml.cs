@@ -459,8 +459,7 @@ public sealed partial class MainWindow : Window
         // If any monitor with a physical handle failed DDC/CI brightness detection,
         // schedule an automatic retry. Some monitors need the handles to be released
         // and re-acquired with the message pump running in between.
-        if (_monitorRetryCount < 3 &&
-            _monitors.Any(m => m.PhysicalMonitorHandle != IntPtr.Zero && !m.SupportsBrightness))
+        if (ShouldRetryMonitorLoad(_monitorRetryCount, _monitors))
         {
             _monitorRetryCount++;
             _ = RetryLoadMonitorsAsync();
@@ -584,6 +583,16 @@ public sealed partial class MainWindow : Window
         };
 
         return (x, y);
+    }
+
+    /// <summary>
+    /// Determines whether the monitor list should be reloaded to retry DDC/CI brightness detection.
+    /// </summary>
+    internal static bool ShouldRetryMonitorLoad(
+        int retryCount, IReadOnlyList<MonitorDevice> monitors, int maxRetries = 3)
+    {
+        return retryCount < maxRetries &&
+            monitors.Any(m => m.PhysicalMonitorHandle != IntPtr.Zero && !m.SupportsBrightness);
     }
 
     #endregion

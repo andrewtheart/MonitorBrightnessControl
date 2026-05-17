@@ -56,9 +56,7 @@ internal sealed class WindowSizer
 
     public void ResizeToFit(Grid rootGrid, StackPanel monitorPanel, ScrollViewer scrollViewer, int monitorCount, int maxVisibleMonitors)
     {
-        int visibleCount = Math.Min(monitorCount, maxVisibleMonitors);
-        if (visibleCount == 0)
-            visibleCount = 1;
+        int visibleCount = ClampVisibleCount(monitorCount, maxVisibleMonitors);
 
         _window.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
@@ -182,6 +180,32 @@ internal sealed class WindowSizer
             return false;
         return Math.Abs(targetClientHeight - currentClientHeight) > 1;
     }
+
+    /// <summary>
+    /// Clamps the visible monitor count: at least 1, at most maxVisibleMonitors.
+    /// </summary>
+    internal static int ClampVisibleCount(int monitorCount, int maxVisibleMonitors)
+    {
+        int count = Math.Min(monitorCount, maxVisibleMonitors);
+        return count == 0 ? 1 : count;
+    }
+
+    /// <summary>
+    /// Converts a DPI value to a scale factor (96 DPI = 1.0×).
+    /// </summary>
+    internal static double CalculateScale(uint dpi) => dpi / 96.0;
+
+    /// <summary>
+    /// Converts a client-area width in pixels to DIPs, floored at 1.
+    /// </summary>
+    internal static double CalculateWidthDips(int clientWidthPixels, double scale)
+        => Math.Max(clientWidthPixels / scale, 1);
+
+    /// <summary>
+    /// Converts a desired height in DIPs to pixels, clamped to a minimum of 200.
+    /// </summary>
+    internal static int CalculateTargetClientHeight(double desiredHeightDips, double scale)
+        => Math.Max((int)Math.Ceiling(desiredHeightDips * scale), 200);
 
     private void VerifyAutoSize(Grid rootGrid, bool shouldScroll, int pass)
     {

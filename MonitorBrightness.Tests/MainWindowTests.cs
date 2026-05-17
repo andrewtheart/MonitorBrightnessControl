@@ -125,4 +125,65 @@ public sealed class MainWindowTests
         Assert.InRange(x, 0, 1920 - 580);
         Assert.InRange(y, 0, 1080 - 400);
     }
+
+    [Fact]
+    public void ShouldRetryMonitorLoad_NoMonitors_ReturnsFalse()
+    {
+        Assert.False(MainWindow.ShouldRetryMonitorLoad(0, []));
+    }
+
+    [Fact]
+    public void ShouldRetryMonitorLoad_AllSupportBrightness_ReturnsFalse()
+    {
+        var monitors = new List<MonitorDevice>
+        {
+            new() { PhysicalMonitorHandle = (IntPtr)1, SupportsBrightness = true },
+            new() { PhysicalMonitorHandle = (IntPtr)2, SupportsBrightness = true },
+        };
+        Assert.False(MainWindow.ShouldRetryMonitorLoad(0, monitors));
+    }
+
+    [Fact]
+    public void ShouldRetryMonitorLoad_MonitorLacksBrightness_ReturnsTrue()
+    {
+        var monitors = new List<MonitorDevice>
+        {
+            new() { PhysicalMonitorHandle = (IntPtr)1, SupportsBrightness = true },
+            new() { PhysicalMonitorHandle = (IntPtr)2, SupportsBrightness = false },
+        };
+        Assert.True(MainWindow.ShouldRetryMonitorLoad(0, monitors));
+    }
+
+    [Fact]
+    public void ShouldRetryMonitorLoad_ZeroHandle_ReturnsFalse()
+    {
+        // Monitors with zero handle are display-only — no DDC/CI retry
+        var monitors = new List<MonitorDevice>
+        {
+            new() { PhysicalMonitorHandle = IntPtr.Zero, SupportsBrightness = false },
+        };
+        Assert.False(MainWindow.ShouldRetryMonitorLoad(0, monitors));
+    }
+
+    [Fact]
+    public void ShouldRetryMonitorLoad_MaxRetriesReached_ReturnsFalse()
+    {
+        var monitors = new List<MonitorDevice>
+        {
+            new() { PhysicalMonitorHandle = (IntPtr)1, SupportsBrightness = false },
+        };
+        Assert.True(MainWindow.ShouldRetryMonitorLoad(2, monitors));
+        Assert.False(MainWindow.ShouldRetryMonitorLoad(3, monitors));
+    }
+
+    [Fact]
+    public void ShouldRetryMonitorLoad_CustomMaxRetries()
+    {
+        var monitors = new List<MonitorDevice>
+        {
+            new() { PhysicalMonitorHandle = (IntPtr)1, SupportsBrightness = false },
+        };
+        Assert.True(MainWindow.ShouldRetryMonitorLoad(0, monitors, maxRetries: 1));
+        Assert.False(MainWindow.ShouldRetryMonitorLoad(1, monitors, maxRetries: 1));
+    }
 }

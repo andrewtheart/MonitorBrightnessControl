@@ -116,4 +116,46 @@ public sealed class WindowSizerTests
         Assert.True(WindowSizer.ShouldRetryAutoSize(2, 500, 400, maxPasses: 3));
         Assert.False(WindowSizer.ShouldRetryAutoSize(3, 500, 400, maxPasses: 3));
     }
+
+    [Theory]
+    [InlineData(5, 4, 4)]    // more monitors than max → clamped
+    [InlineData(3, 4, 3)]    // fewer monitors than max
+    [InlineData(0, 4, 1)]    // zero monitors → floored to 1
+    [InlineData(0, 0, 1)]    // both zero → floored to 1
+    [InlineData(1, 1, 1)]    // exactly one
+    public void ClampVisibleCount_ClampsCorrectly(int monitorCount, int max, int expected)
+    {
+        Assert.Equal(expected, WindowSizer.ClampVisibleCount(monitorCount, max));
+    }
+
+    [Theory]
+    [InlineData(96u, 1.0)]
+    [InlineData(192u, 2.0)]
+    [InlineData(144u, 1.5)]
+    [InlineData(120u, 1.25)]
+    public void CalculateScale_ComputesCorrectly(uint dpi, double expected)
+    {
+        Assert.Equal(expected, WindowSizer.CalculateScale(dpi));
+    }
+
+    [Theory]
+    [InlineData(960, 1.0, 960.0)]
+    [InlineData(960, 2.0, 480.0)]
+    [InlineData(0, 1.0, 1.0)]        // zero width → clamped to 1
+    [InlineData(-100, 1.0, 1.0)]     // negative → clamped to 1
+    public void CalculateWidthDips_ComputesCorrectly(int pixels, double scale, double expected)
+    {
+        Assert.Equal(expected, WindowSizer.CalculateWidthDips(pixels, scale));
+    }
+
+    [Theory]
+    [InlineData(400.0, 1.0, 400)]
+    [InlineData(400.0, 2.0, 800)]
+    [InlineData(400.5, 1.0, 401)]    // ceiling
+    [InlineData(100.0, 1.0, 200)]    // clamped to min 200
+    [InlineData(0.0, 1.0, 200)]      // zero → min 200
+    public void CalculateTargetClientHeight_ComputesCorrectly(double dips, double scale, int expected)
+    {
+        Assert.Equal(expected, WindowSizer.CalculateTargetClientHeight(dips, scale));
+    }
 }
