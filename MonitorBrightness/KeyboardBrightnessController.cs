@@ -177,9 +177,12 @@ internal sealed class KeyboardBrightnessController
 
     internal static int GetKeyboardStep(bool ctrl, bool shift)
     {
-        if (ctrl && shift) return 25;
-        if (shift) return 10;
-        if (ctrl) return 1;
+        if (ctrl && shift)
+            return 25;
+        if (shift)
+            return 10;
+        if (ctrl)
+            return 1;
         return 5;
     }
 

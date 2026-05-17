@@ -140,7 +140,8 @@ public class TrayIconManager : IDisposable
     private void ShowContextMenu()
     {
         var hMenu = CreatePopupMenu();
-        if (hMenu == IntPtr.Zero) return;
+        if (hMenu == IntPtr.Zero)
+            return;
 
         try
         {
@@ -174,7 +175,8 @@ public class TrayIconManager : IDisposable
 
     public void Remove()
     {
-        if (!_added) return;
+        if (!_added)
+            return;
 
         var nid = new NOTIFYICONDATA
         {

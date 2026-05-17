@@ -37,7 +37,8 @@ internal sealed class WindowSizer
     public void ResizeToFit(Grid rootGrid, StackPanel monitorPanel, ScrollViewer scrollViewer, int monitorCount, int maxVisibleMonitors)
     {
         int visibleCount = Math.Min(monitorCount, maxVisibleMonitors);
-        if (visibleCount == 0) visibleCount = 1;
+        if (visibleCount == 0)
+            visibleCount = 1;
 
         _window.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
@@ -108,7 +109,8 @@ internal sealed class WindowSizer
         int count = 0;
         foreach (FrameworkElement child in monitorPanel.Children.Cast<FrameworkElement>())
         {
-            if (count >= visibleCount) break;
+            if (count >= visibleCount)
+                break;
 
             child.UpdateLayout();
             double height = child.ActualHeight;

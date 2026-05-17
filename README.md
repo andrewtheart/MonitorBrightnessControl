@@ -4,11 +4,6 @@ A Windows app for adjusting brightness independently for each attached monitor u
 
 ![Monitor Brightness Control](screenshot.png)
 
-## Versions
-
-- `MonitorBrightness\` - WinUI 3 / .NET 10 app.
-- `pythonVersion\` - original Python/tkinter version kept for reference.
-
 ## License
 
 This project is licensed under the MIT License. See `LICENSE`.
@@ -51,7 +46,7 @@ All other functionality uses built-in Windows and .NET APIs:
 - **DDC/CI brightness control** — `dxva2.dll` (`GetMonitorBrightness`, `SetMonitorBrightness`, `SetVCPFeature`)
 - **Window management** — `user32.dll` (subclassing, foreground, DPI)
 - **System tray icon** — `shell32.dll` (`Shell_NotifyIcon`)
-- **Monitor EDID names** — Windows Setup API / registry
+- **Monitor EDID names** — Windows registry (`Microsoft.Win32.Registry`)
 
 ## WinUI 3 app features
 
@@ -67,8 +62,7 @@ All other functionality uses built-in Windows and .NET APIs:
 - System tray support:
   - Closing the window minimizes to the tray.
   - Single-click or double-click the tray icon restores the window.
-  - The first close shows a one-time explanation and gives an option to close the app entirely.
-- First-launch prompt explaining that a global hotkey can be configured.
+  - First-launch prompt explaining close-to-tray behavior and offering to open settings for hotkey configuration.
 - Settings are stored next to the executable in `monitor_brightness_settings.json`.
 - Diagnostic warnings are logged to `%LOCALAPPDATA%\MonitorBrightness\monitor_brightness.log`.
 - Custom monitor/sun app icon in the title bar and system tray.
@@ -110,21 +104,22 @@ Or use the convenience scripts:
 Published executable examples:
 
 ```powershell
-MonitorBrightness.exe --list           # List all detected monitors and show their current brightness levels
-MonitorBrightness.exe --get 2          # Show the current brightness for monitor 2
-MonitorBrightness.exe --set 1 75       # Set monitor 1 brightness to 75%
-MonitorBrightness.exe --set all 50     # Set all brightness-capable monitors to 50%
-MonitorBrightness.exe --set 1,3 75     # Set monitors 1 and 3 to 75%
-MonitorBrightness.exe --set 1-4 60     # Set monitors 1 through 4 to 60%
-MonitorBrightness.exe --set 1 3 4 80   # Set monitors 1, 3, and 4 to 80% using space-separated targets
-MonitorBrightness.exe --identify       # Print monitor identification information to help match monitor numbers
+MonitorBrightness.exe --list                                        # List all detected monitors and show their current brightness levels
+MonitorBrightness.exe --get                                         # Show current brightness for all monitors
+MonitorBrightness.exe --get --monitor 2                             # Show the current brightness for monitor 2
+MonitorBrightness.exe --setlevel --monitors 1 --level 75            # Set monitor 1 brightness to 75%
+MonitorBrightness.exe --setlevel --monitors all --level 50          # Set all brightness-capable monitors to 50%
+MonitorBrightness.exe --setlevel --monitors 1,3 --level 75          # Set monitors 1 and 3 to 75%
+MonitorBrightness.exe --setlevel --monitors 1-4 --level 60          # Set monitors 1 through 4 to 60%
+MonitorBrightness.exe --setlevel --monitors 1 3 4 --level 80        # Set monitors 1, 3, and 4 to 80%
+MonitorBrightness.exe --identify                                    # Print monitor identification information to help match monitor numbers
 ```
 
 Commands:
 
 - `--list`, `-l` - list monitors and current brightness.
-- `--get [n]`, `-g [n]` - get brightness for monitor `n`, or all monitors if omitted.
-- `--set <targets> <value>`, `-s <targets> <value>` - set brightness to `0-100`.
+- `--get [--monitor <n>]` - get brightness for all monitors, or for a specific monitor with `--monitor`.
+- `--setlevel --monitors <targets> --level <value>` - set brightness to `0-100`.
   - Targets can be a single monitor (`1`), all monitors (`all`), comma-separated (`1,3`), a range (`1-4`), or space-separated (`1 3 4`).
 - `--identify`, `--id` - print monitor identification information.
 - `--help`, `/help`, `-h`, `-?`, `/?` - show CLI help. If any help flag is present, all other CLI flags are ignored.

@@ -348,7 +348,8 @@ public static class MonitorEnumerator
             // Search registry for EDID
             using var displayKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
                 @"SYSTEM\CurrentControlSet\Enum\DISPLAY");
-            if (displayKey == null) return "";
+            if (displayKey == null)
+                return "";
 
             foreach (var subName in displayKey.GetSubKeyNames())
             {
@@ -356,12 +357,14 @@ public static class MonitorEnumerator
                     continue;
 
                 using var sub = displayKey.OpenSubKey(subName);
-                if (sub == null) continue;
+                if (sub == null)
+                    continue;
 
                 foreach (var instanceName in sub.GetSubKeyNames())
                 {
                     using var paramsKey = sub.OpenSubKey($@"{instanceName}\Device Parameters");
-                    if (paramsKey == null) continue;
+                    if (paramsKey == null)
+                        continue;
 
                     if (paramsKey.GetValue("EDID") is byte[] edid)
                     {
@@ -400,7 +403,8 @@ public static class MonitorEnumerator
                 var name = "";
                 foreach (var b in nameBytes)
                 {
-                    if (b == 0x0A || b == 0x00) break;
+                    if (b == 0x0A || b == 0x00)
+                        break;
                     name += (char)b;
                 }
                 return name.Trim();

@@ -36,8 +36,8 @@ public static class CliHandler
                 ListMonitors();
                 return true;
 
-            case "set":
-            case "s":
+            case "setlevel":
+            case "sl":
                 AttachConsole(ATTACH_PARENT_PROCESS);
                 SetBrightness(args);
                 return true;
@@ -82,11 +82,12 @@ public static class CliHandler
         Console.WriteLine("      List all detected monitors, including display number, name,");
         Console.WriteLine("      resolution, current brightness, brightness range, and DDC/CI support.");
         Console.WriteLine();
-        Console.WriteLine("  --get, -g [monitor]");
-        Console.WriteLine("      Print brightness for one monitor, or for all monitors if omitted.");
-        Console.WriteLine("      Monitor numbers are 1-based and match the app UI and --list output.");
+        Console.WriteLine("  --get [--monitor <n>]");
+        Console.WriteLine("      Print brightness for all monitors, or for a specific monitor when");
+        Console.WriteLine("      --monitor is given. Monitor numbers are 1-based and match the");
+        Console.WriteLine("      app UI and --list output.");
         Console.WriteLine();
-        Console.WriteLine("  --set, -s <targets> <value>");
+        Console.WriteLine("  --setlevel --monitors <targets> --level <value>");
         Console.WriteLine("      Set brightness for one or more monitors. Value must be 0-100.");
         Console.WriteLine("      Targets can be:");
         Console.WriteLine("        1       single monitor");
@@ -112,17 +113,17 @@ public static class CliHandler
         Console.WriteLine("Examples:");
         Console.WriteLine("  MonitorBrightness --list");
         Console.WriteLine("  MonitorBrightness --get");
-        Console.WriteLine("  MonitorBrightness --get 2");
-        Console.WriteLine("  MonitorBrightness --set 1 75");
-        Console.WriteLine("  MonitorBrightness --set all 50");
-        Console.WriteLine("  MonitorBrightness --set 1,3 75");
-        Console.WriteLine("  MonitorBrightness --set 1-4 60");
-        Console.WriteLine("  MonitorBrightness --set 1 3 4 80");
+        Console.WriteLine("  MonitorBrightness --get --monitor 2");
+        Console.WriteLine("  MonitorBrightness --setlevel --monitors 1 --level 75");
+        Console.WriteLine("  MonitorBrightness --setlevel --monitors all --level 50");
+        Console.WriteLine("  MonitorBrightness --setlevel --monitors 1,3 --level 75");
+        Console.WriteLine("  MonitorBrightness --setlevel --monitors 1-4 --level 60");
+        Console.WriteLine("  MonitorBrightness --setlevel --monitors 1 3 4 --level 80");
         Console.WriteLine("  MonitorBrightness --identify");
         Console.WriteLine("  MonitorBrightness --position TopRight");
         Console.WriteLine("  MonitorBrightness --position BottomLeft --display 2");
-        Console.WriteLine("  MonitorBrightness --set 1 75 --help");
-        Console.WriteLine("      Shows help; the --set command is ignored because --help is present.");
+        Console.WriteLine("  MonitorBrightness --setlevel --monitors 1 --level 75 --help");
+        Console.WriteLine("      Shows help; the --setlevel command is ignored because --help is present.");
         Console.WriteLine();
     }
 
@@ -163,7 +164,8 @@ public static class CliHandler
         var monitors = MonitorEnumerator.GetMonitors();
         try
         {
-            if (args.Length > 1 && int.TryParse(args[1], out int monIndex))
+            var monitorStr = CliArgumentParser.ExtractSingleValue(args, "--monitor");
+            if (monitorStr != null && int.TryParse(monitorStr, out int monIndex))
             {
                 var mon = monitors.FirstOrDefault(m => m.Index + 1 == monIndex);
                 if (mon == null)
@@ -197,31 +199,35 @@ public static class CliHandler
     private static void SetBrightness(string[] args)
     {
         Console.WriteLine();
-        if (args.Length < 3)
+        string[] targetTokens = CliArgumentParser.ExtractValues(args, "--monitors");
+        string? levelStr = CliArgumentParser.ExtractSingleValue(args, "--level");
+
+        if (targetTokens.Length == 0)
         {
-            Console.WriteLine("Error: --set requires <targets> <value>");
-            Console.WriteLine("  Example: --set 1 75");
-            Console.WriteLine("  Example: --set all 50");
-            Console.WriteLine("  Example: --set 1,3 75");
-            Console.WriteLine("  Example: --set 1-4 60");
+            Console.WriteLine("Error: --setlevel requires --monitors <targets>");
+            Console.WriteLine("  Example: --setlevel --monitors 1 --level 75");
+            Console.WriteLine("  Example: --setlevel --monitors all --level 50");
+            Console.WriteLine("  Example: --setlevel --monitors 1,3 --level 75");
+            Console.WriteLine("  Example: --setlevel --monitors 1-4 --level 60");
+            return;
+        }
+
+        if (levelStr == null || !int.TryParse(levelStr, out int value) || value < 0 || value > 100)
+        {
+            Console.WriteLine("Error: --setlevel requires --level <0-100>");
+            Console.WriteLine("  Example: --setlevel --monitors 1 --level 75");
             return;
         }
 
         var monitors = MonitorEnumerator.GetMonitors(readBrightness: false);
-        string[] targetTokens = args[1..^1];
         try
         {
-            if (!int.TryParse(args[^1], out int value) || value < 0 || value > 100)
-            {
-                Console.WriteLine("Error: Brightness value must be 0-100.");
-                return;
-            }
 
             var targets = CliArgumentParser.ResolveTargetMonitors(monitors, targetTokens);
             if (targets.Count == 0)
             {
                 Console.WriteLine("Error: No matching monitors found. Use --list to see available monitors.");
-                Console.WriteLine("Targets can be: all, 1, 1,3, 1-4, or 1 3 4.");
+                Console.WriteLine("Use --monitors with: all, 1, 1,3, 1-4, or 1 3 4.");
                 Console.WriteLine();
                 return;
             }

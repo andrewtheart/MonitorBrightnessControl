@@ -190,7 +190,8 @@ public sealed partial class MainWindow : Window
 
     private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_isClosing) return;
+        if (_isClosing)
+            return;
 
         if (_settings.CloseToTray)
         {
@@ -333,7 +334,8 @@ public sealed partial class MainWindow : Window
 
     private void HotkeyTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (!_isRecordingHotkey) return;
+        if (!_isRecordingHotkey)
+            return;
 
         e.Handled = true;
 
@@ -351,10 +353,14 @@ public sealed partial class MainWindow : Window
         var altState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu);
         var winState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.LeftWindows);
 
-        if (ctrlState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) modifiers |= HotkeyManager.MOD_CONTROL;
-        if (shiftState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) modifiers |= HotkeyManager.MOD_SHIFT;
-        if (altState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) modifiers |= HotkeyManager.MOD_ALT;
-        if (winState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) modifiers |= HotkeyManager.MOD_WIN;
+        if (ctrlState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+            modifiers |= HotkeyManager.MOD_CONTROL;
+        if (shiftState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+            modifiers |= HotkeyManager.MOD_SHIFT;
+        if (altState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+            modifiers |= HotkeyManager.MOD_ALT;
+        if (winState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+            modifiers |= HotkeyManager.MOD_WIN;
 
         // Require at least one modifier
         if (modifiers == 0)
@@ -400,7 +406,8 @@ public sealed partial class MainWindow : Window
 
     private void MaxMonitorsNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
-        if (double.IsNaN(args.NewValue)) return;
+        if (double.IsNaN(args.NewValue))
+            return;
         _settings.MaxVisibleMonitors = (int)args.NewValue;
         _settings.Save();
         _windowSizer.ResizeToFit(RootGrid, MonitorPanel, MonitorScrollViewer, _monitors.Count, _settings.MaxVisibleMonitors);
@@ -419,7 +426,8 @@ public sealed partial class MainWindow : Window
 
     private void StartDisplayNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
-        if (double.IsNaN(args.NewValue)) return;
+        if (double.IsNaN(args.NewValue))
+            return;
         _settings.StartDisplay = (int)args.NewValue;
         _settings.Save();
     }

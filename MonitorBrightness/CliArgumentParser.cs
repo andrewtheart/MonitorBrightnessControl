@@ -51,6 +51,48 @@ internal static class CliArgumentParser
             .ToList();
     }
 
+    /// <summary>
+    /// Collects all values following <paramref name="flagName"/> until the next
+    /// <c>--</c> flag or end of args.
+    /// </summary>
+    public static string[] ExtractValues(string[] args, string flagName)
+    {
+        var values = new List<string>();
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].Equals(flagName, StringComparison.OrdinalIgnoreCase))
+            {
+                for (int j = i + 1; j < args.Length; j++)
+                {
+                    if (args[j].StartsWith("--", StringComparison.Ordinal))
+                        break;
+                    values.Add(args[j]);
+                }
+                break;
+            }
+        }
+
+        return values.ToArray();
+    }
+
+    /// <summary>
+    /// Returns the single value immediately after <paramref name="flagName"/>,
+    /// or <c>null</c> if the flag is absent or has no value.
+    /// </summary>
+    public static string? ExtractSingleValue(string[] args, string flagName)
+    {
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i].Equals(flagName, StringComparison.OrdinalIgnoreCase))
+            {
+                var next = args[i + 1];
+                return next.StartsWith("--", StringComparison.Ordinal) ? null : next;
+            }
+        }
+        return null;
+    }
+
     private static bool TryParseRange(string token, out int start, out int end)
     {
         start = 0;
